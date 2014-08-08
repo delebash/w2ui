@@ -8,7 +8,7 @@ $(function () {
             { type: 'main', style: 'background-color: white;' }
         ]
     });
-    w2ui['main_layout'].content('top', '<div style="padding: 12px 20px; font-size: 18px;">W2UI 1.3 Demos</div>');
+    w2ui['main_layout'].content('top', '<div style="padding: 12px 20px; font-size: 18px;">W2UI 1.4 Demos</div>');
     // w2ui['main_layout'].content('top', '<div style="padding: 9px;">'+
     //     'Theme: '+
     //     '<select onchange="$(\'#mainCSS\').attr(\'href\', this.value);">'+
@@ -81,7 +81,7 @@ $(function () {
                     { id: 'grid-22', text: 'Resizable Columns', icon: 'fa-table' },
                     { id: 'grid-24', text: 'Lock/Unlock Grid', icon: 'fa-table' },
                     { id: 'grid-25', text: 'Re-Order Columns', icon: 'fa-table' },
-                    //{ id: 'grid-26', text: 'Re-Order records', icon: 'fa-table' },
+                    { id: 'grid-26', text: 'Re-Order Records', icon: 'fa-table' },
                     //{ id: 'grid-27', text: 'Locked Columns', icon: 'fa-table' }
                 ]
             },
@@ -106,15 +106,15 @@ $(function () {
                     { id: 'sidebar-7', text: 'Events', icon: 'fa-hand-left' }
                 ]
             },
-            { id: 'listview', text: 'ListView', img: 'icon-folder', group1: true,
-                nodes: [
-                    { id: 'listview-1', text: 'Simple ListView', icon: 'fa-folder-close-alt' },
-                    { id: 'listview-2', text: 'Different view types', icon: 'fa-folder-close-alt' },
-                    { id: 'listview-5', text: 'Table view type', icon: 'fa-folder-close-alt' },
-                    { id: 'listview-3', text: 'Selecting items', icon: 'fa-folder-close-alt' },
-                    { id: 'listview-4', text: 'Add/Remove items', icon: 'fa-folder-close-alt' }
-                ]
-            },
+            // { id: 'listview', text: 'ListView', img: 'icon-folder', group1: true,
+            //     nodes: [
+            //         { id: 'listview-1', text: 'Simple ListView', icon: 'fa-folder-close-alt' },
+            //         { id: 'listview-2', text: 'Different view types', icon: 'fa-folder-close-alt' },
+            //         { id: 'listview-5', text: 'Table view type', icon: 'fa-folder-close-alt' },
+            //         { id: 'listview-3', text: 'Selecting items', icon: 'fa-folder-close-alt' },
+            //         { id: 'listview-4', text: 'Add/Remove items', icon: 'fa-folder-close-alt' }
+            //     ]
+            // },
             { id: 'tabs', text: 'Tabs', img: 'icon-folder', group1: true,
                 nodes: [
                     { id: 'tabs-1', text: 'Simple Tabs', icon: 'fa-folder-close-alt' },
@@ -128,14 +128,23 @@ $(function () {
             { id: 'forms', text: 'Forms', img: 'icon-folder', group1: true,
                 nodes: [
                     { id: 'forms-1', text: 'Simple Form', icon: 'fa-edit' },
+                    { id: 'forms-10',text: 'Auto Templates', icon: 'fa-edit' },
                     { id: 'forms-2', text: 'Field Types', icon: 'fa-edit' },
                     { id: 'forms-3', text: 'Large Form', icon: 'fa-edit' },
                     { id: 'forms-4', text: 'Multi Page Form', icon: 'fa-edit' },
                     { id: 'forms-5', text: 'Form Tabs', icon: 'fa-edit' },
                     { id: 'forms-9', text: 'Form Toolbar', icon: 'fa-edit' },
                     { id: 'forms-8', text: 'Form in a Popup', icon: 'fa-edit' },
-                    { id: 'forms-6', text: 'Events', icon: 'fa-edit' },
-                    { id: 'forms-7', text: 'Input Controls', icon: 'fa-edit' }
+                    { id: 'forms-6', text: 'Events', icon: 'fa-edit' }
+                ]
+            },
+            { id: 'fields', text: 'Fields', img: 'icon-folder', group1: true,
+                nodes: [
+                    { id: 'fields-1', text: 'Numeric', icon: 'fa-edit' },
+                    { id: 'fields-2', text: 'Date & Time', icon: 'fa-edit' },
+                    { id: 'fields-3', text: 'Drop Down Lists', icon: 'fa-edit' },
+                    { id: 'fields-4', text: 'Multi Selects', icon: 'fa-edit' },
+                    { id: 'fields-5', text: 'File Upload', icon: 'fa-edit' }
                 ]
             },
             { id: 'popup', text: 'Popup', img: 'icon-folder', group1: true,
@@ -147,6 +156,7 @@ $(function () {
                     { id: 'popup-5', text: 'Load Content', icon: 'fa-list-alt' },
                     { id: 'popup-6', text: 'Transitions', icon: 'fa-list-alt' },
                     { id: 'popup-7', text: 'Slide a Message', icon: 'fa-list-alt' },
+                    { id: 'popup-9', text: 'Lock Content', icon: 'fa-list-alt' },
                     { id: 'popup-8', text: 'Dialogs', icon: 'fa-list-alt' }
                 ]
             },
@@ -201,9 +211,9 @@ $(function () {
                            '<html>\n'+
                            '<head>\n'+
                            '    <title>W2UI Demo: '+ cmd +'</title>\n'+
-                           '    <link rel="stylesheet" type="text/css" href="dist/w2ui.css" />\n'+
-                           '    <script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.2/jquery.min.js"></script>\n'+
-                           '    <script type="text/javascript" src="dist/w2ui.js"></script>\n'+
+                           '    <link rel="stylesheet" type="text/css" href="http://w2ui.com/src/w2ui-1.4.min.css" />\n'+
+                           '    <script src="http://ajax.googleapis.com/ajax/libs/jquery/2.1.0/jquery.min.js"></script>\n'+
+                           '    <script type="text/javascript" src="http://w2ui.com/src/w2ui-1.4.min.js"></script>\n'+
                            '</head>\n'+
                            '<body>\n\n'+
                            html + '\n\n'+
@@ -227,7 +237,7 @@ $(function () {
                     '<div style="display: none">'+
                     '<form id="fiddleForm" target="_blank" action="http://jsfiddle.net/api/post/jquery/2.x/" method="post">'+
                     '    <textarea name="title">W2UI Demo: '+ cmd +'</textarea>'+
-                    '    <textarea name="resources">//w2ui.com/src/w2ui-1.3.min.js,//w2ui.com/src/w2ui-1.3.min.css</textarea>'+
+                    '    <textarea name="resources">http://w2ui.com/src/w2ui-1.4.min.js,http://w2ui.com/src/w2ui-1.4.min.css</textarea>'+
                     '    <textarea name="html">'+ html.replace(/<textarea/gi, '&lt;textarea').replace(/<\/textarea>/gi, '&lt;/textarea&gt;') +'</textarea>'+
                     '    <textarea name="js">'+ js +'</textarea>'+
                     '    <textarea name="css">'+ css +'</textarea>'+
@@ -267,10 +277,10 @@ $(function () {
                 w2ui['demo-sidebar'].click(tmp[1] || 'sidebar-1');
                 break;
 
-            case '#!listview':
-                w2ui['demo-sidebar'].expand('listview');
-                w2ui['demo-sidebar'].click(tmp[1] || 'listview-1');
-                break;
+            // case '#!listview':
+            //     w2ui['demo-sidebar'].expand('listview');
+            //     w2ui['demo-sidebar'].click(tmp[1] || 'listview-1');
+            //     break;
 
             case '#!tabs':
                 w2ui['demo-sidebar'].expand('tabs');
@@ -285,6 +295,11 @@ $(function () {
             case '#!forms':
                 w2ui['demo-sidebar'].expand('forms');
                 w2ui['demo-sidebar'].click(tmp[1] || 'forms-1');
+                break;
+
+            case '#!fields':
+                w2ui['demo-sidebar'].expand('fields');
+                w2ui['demo-sidebar'].click(tmp[1] || 'fields-1');
                 break;
 
             case '#!utils':

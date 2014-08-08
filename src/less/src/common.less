@@ -38,13 +38,13 @@
 
 .w2ui-centered {
     position: absolute;
+    left: 0px;  // do not use left: 50% as IE has problems
+    right: 0px;
     top: 50%;
-    left: 50%;
-    .transform(translateX(-50%) translateY(-50%));
-    width: 95%;
+    .transform(translateY(-50%));
     max-height: 100%;
     margin: 0px; 
-    padding: 0px 5px;
+    padding: 0px 10px;
     text-align: center;
 }
 
@@ -56,11 +56,6 @@
 /*************************************************
 * ---- Input Controls ----
 */
-
-body {
-    font-family: @main-font-family;
-    font-size: 11px;
-}
 
 input[type=button] {
     .sys-button;
@@ -81,6 +76,17 @@ input:not([type=button]), select, textarea {
         background-color: #f1f1f1;
         color: #777;
     }    
+}
+
+/* IE9-11 specific classes */
+
+/* needs doblue :: */
+input::-ms-clear { 
+    display: none;
+}
+
+input:-ms-input-placeholder {
+    color: #aaa !important;
 }
 
 select {
@@ -286,14 +292,32 @@ input[type=checkbox].w2ui-toggle:focus {
         border-bottom: 1px solid #D3D2D4;
     }
     // image
-    td:first-child {
+    td.menu-icon {
         padding: 3px 0px 4px 6px;
         width: 20px;
+        > span {
+            height: 20px;
+        }
     }
     // caption
-    td:last-child {
+    td.menu-text {
         padding: 8px 10px 8px 5px;
         width: auto;
+    }
+    td.menu-count {
+        text-align: right;
+        & > span {
+            border: @menu-node-count-border;
+            border-radius: 20px;
+            width: auto; 
+            height: 18px;
+            padding: 2px 7px;
+            margin: 3px 5px 0px 5px;
+            background-color: @menu-node-count-background-color;
+            color: @menu-node-count-color;
+            box-shadow: @menu-node-count-shadow;
+            text-shadow: @menu-node-count-text-shadow;
+        }
     }
 
     tr:hover {
@@ -336,6 +360,31 @@ input[type=checkbox].w2ui-toggle:focus {
     background-size: 100%;
     background-repeat: no-repeat;
     background-image: @image-spinner;
+}
+
+/* common icons */
+
+.w2ui-icon {
+    background-repeat: no-repeat;
+    height: 16px;
+    width: 16px;
+    overflow: hidden;
+    margin: 2px 2px;
+    display: inline-block;
+
+    &.icon-search, &.icon-search-down {
+        .background-image(@image-search, no-repeat, center, ~"!important");
+        background-size: 14px 12px !important;
+        opacity: 0.9;
+    }
+
+    &.icon-folder {
+        .background-image(@image-folder, no-repeat, center, ~"!important");
+    }
+
+    &.icon-page {
+        .background-image(@image-page, no-repeat, center, ~"!important");
+    }
 }
 
 /*************************************************

@@ -1,7 +1,7 @@
 module.exports = function (grunt) {
 
-    var w2ui    = '/* w2ui 1.4.x (nightly) (c) http://w2ui.com, vitmalina@gmail.com */\n';
-    var fields  = '/* w2ui-fields.js 1.4.x (nightly), part of w2ui (c) http://w2ui.com, vitmalina@gmail.com */\n';
+    var w2ui    = '/* w2ui 1.5.x (nightly) (c) http://w2ui.com, vitmalina@gmail.com */\n';
+    var fields  = '/* w2ui-fields.js 1.5.x (nightly), part of w2ui (c) http://w2ui.com, vitmalina@gmail.com */\n';
     var ks      = '/* kicstart 0.1.x (nightly) (c) http://w2ui.com/kickstart, vitmalina@gmail.com */\n';
 
     grunt.initConfig({
@@ -91,8 +91,7 @@ module.exports = function (grunt) {
                     'src/w2toolbar.js', 
                     'src/w2sidebar.js', 
                     'src/w2fields.js', 
-                    'src/w2form.js', 
-                    'src/w2listview.js'
+                    'src/w2form.js'
                 ],
                 dest: 'dist/w2ui.js'
             },
@@ -211,7 +210,22 @@ module.exports = function (grunt) {
                 files: ['src/kickstart/less/*.less', 'src/kickstart/less/src/*.less'],
                 tasks: ['less:ks', 'less:ks-min', 'concat:banner-ks-1', 'concat:banner-ks-2']
             }
+        },
+
+        webfont: {
+            icons: {
+                src : 'src/less/icons/svg/*.svg',
+                dest: 'src/less/icons/',
+                options: {
+                    engine  : 'node',
+                    font    : 'icon-font',
+                    syntax  : 'bootstrap',
+                    types   : 'woff',
+                    embed   : true
+                }           
+            }
         }
+
     });
 
     grunt.loadNpmTasks('grunt-contrib-clean');
@@ -220,6 +234,7 @@ module.exports = function (grunt) {
     grunt.loadNpmTasks('grunt-contrib-uglify');
     grunt.loadNpmTasks('grunt-contrib-watch');
     grunt.loadNpmTasks('grunt-shell');
+    grunt.loadNpmTasks('grunt-webfont');
 
     grunt.registerTask('default', ['clean', 'less', 'concat', 'uglify']);
     grunt.registerTask('docs', ['shell:docs']);

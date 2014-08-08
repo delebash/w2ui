@@ -35,7 +35,9 @@
                 text-align: center;
                 // for font icon
                 & > span {
-                    font-size: 16px;
+                    font-size: 15px;
+                    margin-top: 3px;
+                    display: block;
                     color: @toolbar-button-image-color;
                 }
             }
@@ -43,6 +45,21 @@
             .w2ui-tb-caption {
                 color: @toolbar-button-color;
                 padding: 0px 4px 0px 2px;
+            }
+
+            .w2ui-tb-count {
+                padding: 0px 4px 0px 0px;
+                & > span {
+                    border: @menu-node-count-border;
+                    border-radius: 20px;
+                    width: auto; 
+                    height: 18px;
+                    padding: 2px 7px;
+                    background-color: @menu-node-count-background-color;
+                    color: @menu-node-count-color;
+                    box-shadow: @menu-node-count-shadow;
+                    text-shadow: @menu-node-count-text-shadow;
+                }
             }
 
             .w2ui-tb-down {

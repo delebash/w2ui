@@ -9,14 +9,10 @@
 *   - onResize for the panel
 *   - add more panel title positions (left=rotated, right=rotated, bottom)
 *   - bug: resizer is visible (and onHover) when panel is hidden.
+*   - bug: when you assign content before previous transition completed.
 *
-* == 1.4 changes
-*   - deleted getSelection().removeAllRanges() - see https://github.com/vitmalina/w2ui/issues/323
-*   - added panel title
-*   - added panel.maxSize property
-*   - fixed resize bugs
-*   - BUG resize problems (resizer flashes, not very snappy, % should stay in percent)
-*   - added onResizerClick event
+* == 1.5 changes
+*   - $('#layout').w2layout() - if called w/o argument then it returns layout object
 *
 ************************************************************************/
 
@@ -49,7 +45,7 @@
     // -- Registers as a jQuery plugin
 
     $.fn.w2layout = function(method) {
-        if (typeof method === 'object' || !method ) {
+        if ($.isPlainObject(method)) {
             // check name parameter
             if (!w2utils.checkName(method, 'w2layout')) return;
             var panels = method.panels || [];
@@ -73,12 +69,15 @@
             w2ui[object.name] = object;
             return object;
 
-        } else if (w2ui[$(this).attr('name')]) {
-            var obj = w2ui[$(this).attr('name')];
-            obj[method].apply(obj, Array.prototype.slice.call(arguments, 1));
-            return this;
         } else {
-            console.log('ERROR: Method ' +  method + ' does not exist on jQuery.w2layout' );
+            var obj = w2ui[$(this).attr('name')];
+            if (!obj) return null;
+            if (arguments.length > 0) {
+                if (obj[method]) obj[method].apply(obj, Array.prototype.slice.call(arguments, 1));
+                return this;
+            } else {
+                return obj;
+            }
         }
 
         function initTabs(object, panel, tabs) {
@@ -112,8 +111,8 @@
     w2layout.prototype = {
         // default setting for a panel
         panel: {
-            title     : '',
             type      : null,        // left, right, top, bottom
+            title     : '',
             size      : 100,        // width or height depending on panel name
             minSize   : 20,
             maxSize   : false,

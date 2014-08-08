@@ -11,10 +11,11 @@
 <!--CODE-->
 <div id="grid" style="width: 100%; height: 400px;"></div>
 <br>
-<input type="button" value="Lock" onclick="w2ui.grid.lock('Message', true);" style="width: 70px;">
-<input type="button" value="Unlock" onclick="w2ui.grid.unlock();" style="width: 70px;">
-<input type="button" value="Error" onclick="w2ui.grid.error('Error message '+ (new Date()).getTime());" style="width: 70px;">
-<input type="button" value="Status" onclick="w2ui.grid.status('Status message '+ (new Date()).getTime());" style="width: 70px;">
+<button class="btn" onclick="w2ui.grid.lock('Message', true);">Lock</button>
+<button class="btn" onclick="w2ui.grid.unlock();">Unlock</button>
+<button class="btn" onclick="w2ui.grid.lock('', true);">Just a Spinner</button>
+<button class="btn" onclick="w2ui.grid.error('Error message '+ (new Date()).getTime());">Error</button>
+<button class="btn" onclick="w2ui.grid.status('Status message '+ (new Date()).getTime());">Status</button>
 
 <!--CODE-->
 <script>

@@ -11,6 +11,7 @@
 <script type="text/javascript" src="../src/w2grid.js"></script>
 <script>
 $(function () {
+    // w2utils.locale('../src/locale/ru-ru');
 
     $('#grid').w2grid({ 
         name      : 'grid', 
@@ -32,9 +33,10 @@ $(function () {
             selectColumn: true,
             //expandColumn: true,
             lineNumbers: true,
+            toolbarAdd: true,
+            toolbarEdit: true,
             toolbarDelete: true,
-            toolbarSave: true,
-            toolbarAdd: true
+            toolbarSave: true
         },
         menu: [
             { id: 1, text: 'Select Item', icon: 'fa-star' },
@@ -82,6 +84,26 @@ $(function () {
                         { id: 'Peter', text: 'Peter' },
                         { id: 'Frank', text: 'Frank' }, 
                         { id: 'Kate', text: 'Kate' }, 
+                        { id: 'Susan', text: 'Susan' }, 
+                        { id: 'Snehal', text: 'Snehal' }, 
+                        { id: 'Dima', text: 'Dima' }, 
+                    ]
+                }
+            },
+            { field: 'fname', caption: 'First Name', type: 'enum', 
+                options: { 
+                    search: true,
+                    applyFilter: true,
+                    items: [
+                        { id: 'Avinash', text: 'Avinash' }, 
+                        { id: 'Vitali', text: 'Vitali' },
+                        { id: 'Sue', text: 'Sue' },
+                        { id: 'Peter', text: 'Peter' },
+                        { id: 'Frank', text: 'Frank' }, 
+                        { id: 'Kate', text: 'Kate' }, 
+                        { id: 'Susan', text: 'Susan' }, 
+                        { id: 'Snehal', text: 'Snehal' }, 
+                        { id: 'Dima', text: 'Dima' }, 
                     ]
                 }
             },
@@ -183,7 +205,7 @@ $(function () {
     var fname = ['Vitali', 'Katsia', 'John', 'Peter', 'Sue', 'Olivia', 'Thomas', 'Sergei', 'Snehal', 'Avinash', 'Divia'];
     var lname = ['Peterson', 'Rene', 'Johnson', 'Cuban', 'Twist', 'Sidorov', 'Vasiliev', 'Yadav', 'Vaishnav'];
     // add 10k records
-    for (var i = 0; i < 150; i++) {
+    for (var i = 0; i <= 100000; i++) {
         var dt = ((new Date()).getTime() - Math.floor(Math.random() * 1000000000));
         w2ui['grid'].records.push({ 
             recid : (i + 1),
@@ -196,6 +218,7 @@ $(function () {
             stime: dt
         });
     }
+    w2ui.grid.records[10].summary = true;
     w2ui.grid.records[0].sdate = null;
     w2ui.grid.records[3].sdate = null;
     w2ui.grid.records[7].sdate = null;

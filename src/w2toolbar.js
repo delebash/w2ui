@@ -7,12 +7,11 @@
 *
 * == NICE TO HAVE ==
 *   - on overflow display << >>
-*   - verticle toolbar
+*   - vertical toolbar
+*   - declarative toolbar
 *
-* == 1.4 changes
-*   - deleted getSelection().removeAllRanges() - see https://github.com/vitmalina/w2ui/issues/323
-*   - fixed submenu event bugs
-*   - added route support
+* == 1.5 changes
+*   - $('#toolbar').w2toolbar() - if called w/o argument then it returns toolbar object
 *
 ************************************************************************/
 
@@ -36,7 +35,7 @@
     // -- Registers as a jQuery plugin
 
     $.fn.w2toolbar = function(method) {
-        if (typeof method === 'object' || !method ) {
+        if ($.isPlainObject(method)) {
             // check name parameter
             if (!w2utils.checkName(method, 'w2toolbar')) return;
             // extend items
@@ -53,12 +52,15 @@
             w2ui[object.name] = object;
             return object;
 
-        } else if (w2ui[$(this).attr('name')]) {
-            var obj = w2ui[$(this).attr('name')];
-            obj[method].apply(obj, Array.prototype.slice.call(arguments, 1));
-            return this;
         } else {
-            console.log('ERROR: Method ' +  method + ' does not exist on jQuery.w2toolbar' );
+            var obj = w2ui[$(this).attr('name')];
+            if (!obj) return null;
+            if (arguments.length > 0) {
+                if (obj[method]) obj[method].apply(obj, Array.prototype.slice.call(arguments, 1));
+                return this;
+            } else {
+                return obj;
+            }
         }
     };
 
@@ -74,6 +76,7 @@
             html     : '',
             img      : null,
             icon     : null,
+            count    : null,
             hidden   : false,
             disabled : false,
             checked  : false,       // used for radio buttons
@@ -81,6 +84,7 @@
             hint     : '',
             group    : null,        // used for radio buttons
             items    : null,        // for type menu it is an array of items in the menu
+            overlay  : {},
             onClick  : null
         },
 
@@ -395,6 +399,7 @@
                             '  <tr>' +
                                     img +
                                     (item.text !== '' ? '<td class="w2ui-tb-caption" nowrap>'+ item.text +'</td>' : '') +
+                                    (item.count != null ? '<td class="w2ui-tb-count" nowrap><span>'+ item.count +'</span></td>' : '') +
                                     (((item.type === 'drop' || item.type === 'menu') && item.arrow !== false) ?
                                         '<td class="w2ui-tb-down" nowrap><div></div></td>' : '') +
                             '  </tr></table>'+
@@ -436,7 +441,7 @@
                     var info  = w2utils.parseRoute(route);
                     if (info.keys.length > 0) {
                         for (var k = 0; k < info.keys.length; k++) {
-                            if (!this.routeData[info.keys[k].name]) continue;
+                            if (obj.routeData[info.keys[k].name] == null) continue;
                             route = route.replace((new RegExp(':'+ info.keys[k].name, 'g')), this.routeData[info.keys[k].name]);
                         }
                     }

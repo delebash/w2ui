@@ -11,6 +11,7 @@
 .w2ui-field-helper {
     position: absolute; 
     display: inline-block; 
+    line-height: 100%;
     /* pointer-events: none; - do not use as IE does not support it */
     .user-select(none);
 
@@ -334,6 +335,11 @@
     cursor: default;
     color: black !important;
     .linear-gradient(top, #ffffff 20%, #f6f6f6 50%, #eeeeee 52%, #f4f4f4 100%);
+    &[readonly], &[disabled] {
+        background-image: none;
+        background-color: #f1f1f1 !importan;
+        color: #777 !important;
+    }
 }
 
 

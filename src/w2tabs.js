@@ -7,11 +7,12 @@
 *
 * == NICE TO HAVE ==
 *   - on overflow display << >>
+*   - declarative tabs
 *
-* == 1.4 changes
-*   - deleted getSelection().removeAllRanges() - see https://github.com/vitmalina/w2ui/issues/323
-*   - individual tab onClick (possibly other events) are not working
-*   - added route support
+* == 1.5 changes
+*   - $('#tabs').w2tabs() - if called w/o argument then it returns tabs object
+*   - added flow property (up/down)
+*   - added tab.style
 *
 ************************************************************************/
 
@@ -20,6 +21,7 @@
         this.box       = null;      // DOM Element that holds the element
         this.name      = null;      // unique name for w2ui
         this.active    = null;
+        this.flow      = 'down';
         this.tabs      = [];
         this.routeData = {};        // data for dynamic routes
         this.right     = '';
@@ -39,7 +41,7 @@
     // -- Registers as a jQuery plugin
 
     $.fn.w2tabs = function(method) {
-        if (typeof method === 'object' || !method ) {
+        if ($.isPlainObject(method)) {
             // check name parameter
             if (!w2utils.checkName(method, 'w2tabs')) return;
             // extend tabs
@@ -54,13 +56,15 @@
             // register new object
             w2ui[object.name] = object;
             return object;
-        } else if (w2ui[$(this).attr('name')]) {
-            var obj = w2ui[$(this).attr('name')];
-            obj[method].apply(obj, Array.prototype.slice.call(arguments, 1));
-            return this;
         } else {
-            console.log('ERROR: Method ' +  method + ' does not exist on jQuery.w2tabs' );
-            return undefined;
+            var obj = w2ui[$(this).attr('name')];
+            if (!obj) return null;
+            if (arguments.length > 0) {
+                if (obj[method]) obj[method].apply(obj, Array.prototype.slice.call(arguments, 1));
+                return this;
+            } else {
+                return obj;
+            }
         }
     };
 
@@ -76,6 +80,7 @@
             disabled  : false,
             closable  : false,
             hint      : '',
+            style     : '',
             onClick   : null,
             onRefresh : null,
             onClose   : null
@@ -217,7 +222,7 @@
 
         refresh: function (id) {
             var time = (new Date()).getTime();
-            // if (window.getSelection) window.getSelection().removeAllRanges(); // clear selection
+            if (this.flow == 'up') $(this.box).addClass('w2ui-tabs-up'); else $(this.box).removeClass('w2ui-tabs-up');
             // event before
             var eventData = this.trigger({ phase: 'before', type: 'refresh', target: (typeof id !== 'undefined' ? id : this.name), object: this.get(id) });
             if (eventData.isCancelled === true) return;
@@ -233,7 +238,7 @@
                 var jq_el   = $(this.box).find('#tabs_'+ this.name +'_tab_'+ w2utils.escapeId(tab.id));
                 var tabHTML = (tab.closable ? '<div class="w2ui-tab-close" onclick="w2ui[\''+ this.name +'\'].animateClose(\''+ tab.id +'\', event);"></div>' : '') +
                     '    <div class="w2ui-tab'+ (this.active === tab.id ? ' active' : '') + (tab.closable ? ' closable' : '') +'" '+
-                    '        title="'+ (typeof tab.hint !== 'undefined' ? tab.hint : '') +'"'+
+                    '        title="'+ (typeof tab.hint !== 'undefined' ? tab.hint : '') +'" style="'+ tab.style +'" '+ 
                     '        onclick="w2ui[\''+ this.name +'\'].click(\''+ tab.id +'\', event);">' + tab.text + '</div>';
                 if (jq_el.length === 0) {
                     // does not exist - create it
@@ -341,7 +346,7 @@
                 var info  = w2utils.parseRoute(route);
                 if (info.keys.length > 0) {
                     for (var k = 0; k < info.keys.length; k++) {
-                        if (!this.routeData[info.keys[k].name]) continue;
+                        if (this.routeData[info.keys[k].name] == null) continue;
                         route = route.replace((new RegExp(':'+ info.keys[k].name, 'g')), this.routeData[info.keys[k].name]);
                     }
                 }

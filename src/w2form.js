@@ -14,14 +14,12 @@
 *   - verify validation of fields
 *   - when field is blank, set record.field = null
 *   - show/hide a field
-*
-* == 1.4 Changes ==
-*   - refactored for the new fields
 *   - added getChanges() - not complete
-*   - change: get() w/o params returns all field names
-*   - changed template structure for formHTML
-*   - added toggle type - On/Off
-*   - added routeData
+*   - nested record object
+*
+* == 1.5 changes
+*   - $('#form').w2form() - if called w/o argument then it returns form object
+*   - added onProgress
 *
 ************************************************************************/
 
@@ -58,6 +56,7 @@
         this.onLoad      = null;
         this.onValidate  = null;
         this.onSubmit    = null;
+        this.onProgress  = null;
         this.onSave      = null;
         this.onChange    = null;
         this.onRender    = null;
@@ -72,7 +71,7 @@
         this.isGenerated = false;
         this.last = {
             xhr: null        // jquery xhr requests
-        }
+        };
 
         $.extend(true, this, w2obj.form, options);
     };
@@ -81,7 +80,7 @@
     // -- Registers as a jQuery plugin
 
     $.fn.w2form = function(method) {
-        if (typeof method === 'object' || !method ) {
+        if ($.isPlainObject(method)) {
             var obj = this;
             // check name parameter
             if (!w2utils.checkName(method, 'w2form')) return;
@@ -156,12 +155,15 @@
             }
             return object;
 
-        } else if (w2ui[$(this).attr('name')]) {
-            var obj = w2ui[$(this).attr('name')];
-            obj[method].apply(obj, Array.prototype.slice.call(arguments, 1));
-            return this;
         } else {
-            console.log('ERROR: Method ' +  method + ' does not exist on jQuery.w2form');
+            var obj = w2ui[$(this).attr('name')];
+            if (!obj) return null;
+            if (arguments.length > 0) {
+                if (obj[method]) obj[method].apply(obj, Array.prototype.slice.call(arguments, 1));
+                return this;
+            } else {
+                return obj;
+            }
         }
     };
 
@@ -329,7 +331,7 @@
                     }
                 }
                 return result;
-            }
+            };
             return differ(this.record, this.original, {});
         },
 
@@ -361,13 +363,13 @@
             this.lock(this.msgRefresh);
             var url = eventData.url;
             if (typeof eventData.url == 'object' && eventData.url.get) url = eventData.url.get;
-            if (this.last.xhr) try { this.last.xhr.abort(); } catch (e) {};
+            if (this.last.xhr) try { this.last.xhr.abort(); } catch (e) {}
             // process url with routeData
             if (!$.isEmptyObject(obj.routeData)) {
                 var info  = w2utils.parseRoute(url);
                 if (info.keys.length > 0) {
                     for (var k = 0; k < info.keys.length; k++) {
-                        if (!obj.routeData[info.keys[k].name]) continue;
+                        if (obj.routeData[info.keys[k].name] == null) continue;
                         url = url.replace((new RegExp(':'+ info.keys[k].name, 'g')), obj.routeData[info.keys[k].name]);
                     }
                 }
@@ -502,13 +504,13 @@
                 // default action
                 var url = eventData.url;
                 if (typeof eventData.url == 'object' && eventData.url.save) url = eventData.url.save;
-                if (obj.last.xhr) try { obj.last.xhr.abort(); } catch (e) {};
+                if (obj.last.xhr) try { obj.last.xhr.abort(); } catch (e) {}
                 // process url with routeData
                 if (!$.isEmptyObject(obj.routeData)) {
                     var info  = w2utils.parseRoute(url);
                     if (info.keys.length > 0) {
                         for (var k = 0; k < info.keys.length; k++) {
-                            if (!obj.routeData[info.keys[k].name]) continue;
+                            if (obj.routeData[info.keys[k].name] == null) continue;
                             url = url.replace((new RegExp(':'+ info.keys[k].name, 'g')), obj.routeData[info.keys[k].name]);
                         }
                     }
@@ -523,12 +525,17 @@
                         // upload
                         xhr.upload.addEventListener("progress", function(evt) {
                             if (evt.lengthComputable) {
+                                var eventData3 = obj.trigger({ phase: 'before', type: 'progress', total: evt.total, loaded: evt.loaded, originalEvent: evt });
+                                if (eventData3.isCancelled === true) return;
+                                // default behavior
                                 var percent = Math.round(evt.loaded / evt.total * 100);
                                 $('#'+ obj.name + '_progress').text(''+ percent + '%');
+                                // event after
+                                obj.trigger($.extend(eventData3, { phase: 'after' }));
                             }
                         }, false);
                         return xhr;
-                    },
+                    }
                 };
                 if (w2utils.settings.dataType == 'HTTP') {
                     ajaxOptions.data = String($.param(ajaxOptions.data, false)).replace(/%5B/g, '[').replace(/%5D/g, ']');
@@ -655,8 +662,8 @@
                     group = '';
                 }
                 html += '\n      <div class="w2ui-field '+ (typeof field.html.span != 'undefined' ? 'w2ui-span'+ field.html.span : '') +'">'+ 
-                        '\n         <label>' + field.html.caption +'</label>'+
-                        '\n         <div>'+ input + field.html.text + '</div>'+
+                        '\n         <label>' + w2utils.lang(field.html.caption) +'</label>'+
+                        '\n         <div>'+ input + w2utils.lang(field.html.text) + '</div>'+
                         '\n      </div>';
                 if (typeof pages[field.html.page] == 'undefined') pages[field.html.page] = '';
                 pages[field.html.page] += html;
@@ -674,7 +681,7 @@
                 buttons += '\n<div class="w2ui-buttons">';
                 for (var a in this.actions) {
                     if (['save', 'update', 'create'].indexOf(a.toLowerCase()) != -1) addClass = 'btn-green'; else addClass = '';
-                    buttons += '\n    <button name="'+ a +'" class="btn '+ addClass +'">'+ a + '</button>';
+                    buttons += '\n    <button name="'+ a +'" class="btn '+ addClass +'">'+ w2utils.lang(a) +'</button>';
                 }
                 buttons += '\n</div>';
             }
@@ -898,17 +905,20 @@
                     // enums
                     case 'list':
                     case 'combo':
-                        if (field.type == 'list' && !$.isPlainObject(value)) {
+                        if (field.type == 'list') {
+                            var tmp_value = ($.isPlainObject(value) ? value.id : value);
+                            // normalized options
+                            var items = field.options.items;
+                            if ($.isArray(items) && items.length > 0 && !$.isPlainObject(items[0])) {
+                                field.options.items = w2obj.field.prototype.normMenu(items);
+                            }
                             // find value from items 
                             for (var i in field.options.items) {
                                 var item = field.options.items[i];
-                                if ($.isPlainObject(item) && item.id == value) {
+                                if (item.id == tmp_value) {
                                     value = $.extend(true, {}, item);
                                     obj.record[field.name] = value;
-                                    break;
-                                } else if (i == value) {
-                                    value = { id: i, text: item };
-                                    obj.record[field.name] = value;
+                                    console.log(1);
                                     break;
                                 }
                             }

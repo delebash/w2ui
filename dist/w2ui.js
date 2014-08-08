@@ -1,4 +1,4 @@
-/* w2ui 1.4.x (nightly) (c) http://w2ui.com, vitmalina@gmail.com */
+/* w2ui 1.5.x (nightly) (c) http://w2ui.com, vitmalina@gmail.com */
 var w2ui  = w2ui  || {};
 var w2obj = w2obj || {}; // expose object to be able to overwrite default functions
 
@@ -29,38 +29,29 @@ var w2obj = w2obj || {}; // expose object to be able to overwrite default functi
 *   - user localization from another lib (make it generic), https://github.com/jquery/globalize#readme
 *   - hidden and disabled in menus
 *   - isTime should support seconds
+*   - add time zone
 *   - TEST On IOS
 *
-* == 1.4 changes
-*   - lock(box, options) || lock(box, msg, spinner)
-*   - updated age() date(), formatDate(), formatTime() - input format either '2013/12/21 19:03:59 PST' or unix timestamp
-*   - formatNumer(num, groupSymbol) - added new param
-*   - improved localization support (currency prefix, suffix, numbger group symbol)
-*   - improoved overlays (better positioning, refresh, etc.)
-*   - multiple overlay at the same time (if it has name)
-*   - overlay options.css removed, I have added options.style
-*   - ability to open searchable w2menu
-*   - w2confirm({})
-*   - dep. RESTfull
-*   - added: dataType (allows JSON payload)
-*   - added: parse route
-*   - menu items can be disabled now
+* == 1.5 changes
+*   - added decimalSymbol
+*   - renamed size() -> formatSize()
 *
 ************************************************/
 
 var w2utils = (function () {
     var tmp = {}; // for some temp variables
     var obj = {
-        version  : '1.4.x',
+        version  : '1.5.x',
         settings : {
             "locale"            : "en-us",
             "date_format"       : "m/d/yyyy",
             "date_display"      : "Mon d, yyyy",
-            "time_format"       : "h12",
+            "time_format"       : "hh:mi pm",
             "currencyPrefix"    : "$",
             "currencySuffix"    : "",
             "currencyPrecision" : 2,
             "groupSymbol"       : ",",
+            "decimalSymbol"     : ".",
             "shortmonths"       : ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
             "fullmonths"        : ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
             "shortdays"         : ["M", "T", "W", "T", "F", "S", "S"],
@@ -78,7 +69,7 @@ var w2utils = (function () {
         isTime          : isTime,
         age             : age,
         date            : date,
-        size            : size,
+        formatSize      : formatSize,
         formatNumber    : formatNumber,
         formatDate      : formatDate,
         formatTime      : formatTime,
@@ -97,7 +88,15 @@ var w2utils = (function () {
         scrollBarSize   : scrollBarSize,
         checkName       : checkName,
         checkUniqueId   : checkUniqueId,
-        parseRoute      : parseRoute
+        parseRoute      : parseRoute,
+        // some internal variables
+        isIOS : ((navigator.userAgent.toLowerCase().indexOf('iphone') != -1 ||
+                 navigator.userAgent.toLowerCase().indexOf('ipod') != -1 ||
+                 navigator.userAgent.toLowerCase().indexOf('ipad') != -1) 
+                 ? true : false),
+        isIE : ((navigator.userAgent.toLowerCase().indexOf('msie') != -1 ||
+                 navigator.userAgent.toLowerCase().indexOf('trident') != -1 )
+                 ? true : false)
     };
     return obj;
 
@@ -107,12 +106,13 @@ var w2utils = (function () {
     }
 
     function isFloat (val) {
+        if (typeof val == 'string') val = val.replace(w2utils.settings.decimalSymbol, '.');
         return (typeof val === 'number' || (typeof val === 'string' && val !== '')) && !isNaN(Number(val));
     }
 
     function isMoney (val) {
         var se = w2utils.settings;
-        var re = new RegExp('^'+ (se.currencyPrefix ? '\\' + se.currencyPrefix + '?' : '') +'[-+]?[0-9]*[\.]?[0-9]+'+ (se.currencySuffix ? '\\' + se.currencySuffix + '?' : '') +'$', 'i');
+        var re = new RegExp('^'+ (se.currencyPrefix ? '\\' + se.currencyPrefix + '?' : '') +'[-+]?[0-9]*[\\'+ w2utils.settings.decimalSymbol +']?[0-9]+'+ (se.currencySuffix ? '\\' + se.currencySuffix + '?' : '') +'$', 'i');
         if (typeof val === 'string') {
             val = val.replace(new RegExp(se.groupSymbol, 'g'), '');
         }
@@ -154,12 +154,12 @@ var w2utils = (function () {
         } else {
             val = String(val);
             // convert month formats
-            if (RegExp('mon', 'ig').test(format)) {
+            if (new RegExp('mon', 'ig').test(format)) {
                 format = format.replace(/month/ig, 'm').replace(/mon/ig, 'm').replace(/dd/ig, 'd').replace(/[, ]/ig, '/').replace(/\/\//g, '/').toLowerCase();
                 val    = val.replace(/[, ]/ig, '/').replace(/\/\//g, '/').toLowerCase();
                 for (var m = 0, len = w2utils.settings.fullmonths.length; m < len; m++) {
                     var t = w2utils.settings.fullmonths[m];
-                    val = val.replace(RegExp(t, 'ig'), (parseInt(m) + 1)).replace(RegExp(t.substr(0, 3), 'ig'), (parseInt(m) + 1));
+                    val = val.replace(new RegExp(t, 'ig'), (parseInt(m) + 1)).replace(new RegExp(t.substr(0, 3), 'ig'), (parseInt(m) + 1));
                 }
             }
             // format date
@@ -231,7 +231,7 @@ var w2utils = (function () {
     }
 
     function age (dateStr) {
-        if (dateStr === '' || dateStr == null) return '';
+        if (dateStr === '' || dateStr == null || (typeof dateStr == 'object' && !dateStr.getMonth)) return '';
         var d1 = new Date(dateStr);
         if (w2utils.isInt(dateStr)) d1 = new Date(Number(dateStr)); // for unix timestamps
         if (d1 === 'Invalid Date') return '';
@@ -241,7 +241,7 @@ var w2utils = (function () {
         var amount = '';
         var type   = '';
         if (sec < 0) {
-            amount = '<span style="color: #aaa">future</span>';
+            amount = '<span style="color: #aaa">0 sec</span>';
             type   = '';
         } else if (sec < 60) {
             amount = Math.floor(sec);
@@ -256,18 +256,22 @@ var w2utils = (function () {
         } else if (sec < 30*24*60*60) {
             amount = Math.floor(sec/24/60/60);
             type   = 'day';
-        } else if (sec < 12*30*24*60*60) {
+        } else if (sec < 365*24*60*60) {
             amount = Math.floor(sec/30/24/60/60*10)/10;
             type   = 'month';
-        } else if (sec >= 12*30*24*60*60) {
-            amount = Math.floor(sec/12/30/24/60/60*10)/10;
+        } else if (sec < 365*4*24*60*60) {
+            amount = Math.floor(sec/365/24/60/60*10)/10;
+            type   = 'year';
+        } else if (sec >= 365*4*24*60*60) {
+            // factor in leap year shift (only older then 4 years)
+            amount = Math.floor(sec/365.25/24/60/60*10)/10;
             type   = 'year';
         }
         return amount + ' ' + type + (amount > 1 ? 's' : '');
     }
 
     function date (dateStr) {
-        if (dateStr === '' || dateStr == null) return '';
+        if (dateStr === '' || dateStr == null || (typeof dateStr == 'object' && !dateStr.getMonth)) return '';
         var d1 = new Date(dateStr);
         if (w2utils.isInt(dateStr)) d1 = new Date(Number(dateStr)); // for unix timestamps
         if (d1 === 'Invalid Date') return '';
@@ -290,7 +294,7 @@ var w2utils = (function () {
         return '<span title="'+ dd1 +' ' + time2 +'">'+ dsp +'</span>';
     }
 
-    function size (sizeStr) {
+    function formatSize (sizeStr) {
         if (!w2utils.isFloat(sizeStr) || sizeStr === '') return '';
         sizeStr = parseFloat(sizeStr);
         if (sizeStr === 0) return 0;
@@ -299,14 +303,15 @@ var w2utils = (function () {
         return (Math.floor(sizeStr / Math.pow(1024, i) * 10) / 10).toFixed(i === 0 ? 0 : 1) + ' ' + sizes[i];
     }
 
-    function formatNumber (val, groupSymbol) {
+    function formatNumber (val, groupSymbol, decimalSymbol) {
         var ret = '';
         if (groupSymbol == null) groupSymbol = w2utils.settings.groupSymbol || ',';
+        if (decimalSymbol == null) decimalSymbol = w2utils.settings.decimalSymbol || '.';
         // check if this is a number
         if (w2utils.isFloat(val) || w2utils.isInt(val) || w2utils.isMoney(val)) {
             tmp = String(val).split('.');
             ret = String(tmp[0]).replace(/(\d)(?=(\d\d\d)+(?!\d))/g, "$1" + groupSymbol);
-            if (tmp[1] != null) ret += '.' + tmp[1];
+            if (tmp[1] != null) ret += w2utils.settings.decimalSymbol + tmp[1];
         }
         return ret;
     }
@@ -315,7 +320,7 @@ var w2utils = (function () {
         var months = w2utils.settings.shortmonths;
         var fullMonths = w2utils.settings.fullmonths;
         if (!format) format = this.settings.date_format;
-        if (dateStr === '' || dateStr == null) return '';
+        if (dateStr === '' || dateStr == null || (typeof dateStr == 'object' && !dateStr.getMonth)) return '';
 
         var dt = new Date(dateStr);
         if (w2utils.isInt(dateStr)) dt = new Date(Number(dateStr)); // for unix timestamps
@@ -330,18 +335,21 @@ var w2utils = (function () {
             .replace(/yyyy/g, year)
             .replace(/yyy/g, year)
             .replace(/yy/g, year > 2000 ? 100 + parseInt(String(year).substr(2)) : String(year).substr(2))
-            .replace(/(^|[^a-z$])y/g, '$1' + year)             // only y's that are not preceeded by a letter
+            .replace(/(^|[^a-z$])y/g, '$1' + year)            // only y's that are not preceeded by a letter
             .replace(/mm/g, (month + 1 < 10 ? '0' : '') + (month + 1))
             .replace(/dd/g, (date < 10 ? '0' : '') + date)
+            .replace(/th/g, (date == 1 ? 'st' : 'th'))
+            .replace(/th/g, (date == 2 ? 'nd' : 'th'))
+            .replace(/th/g, (date == 3 ? 'rd' : 'th'))
             .replace(/(^|[^a-z$])m/g, '$1' + (month + 1))     // only y's that are not preceeded by a letter
-            .replace(/(^|[^a-z$])d/g, '$1' + date);         // only y's that are not preceeded by a letter
+            .replace(/(^|[^a-z$])d/g, '$1' + date);           // only y's that are not preceeded by a letter
     }
 
     function formatTime (dateStr, format) { // IMPORTANT dateStr HAS TO BE valid JavaScript Date String
         var months = w2utils.settings.shortmonths;
         var fullMonths = w2utils.settings.fullmonths;
-        if (!format) format = (this.settings.time_format === 'h12' ? 'hh:mi pm' : 'h24:mi');
-        if (dateStr === '' || dateStr == null) return '';
+        if (!format) format = this.settings.time_format;
+        if (dateStr === '' || dateStr == null || (typeof dateStr == 'object' && !dateStr.getMonth)) return '';
 
         var dt = new Date(dateStr);
         if (w2utils.isInt(dateStr)) dt  = new Date(Number(dateStr)); // for unix timestamps
@@ -367,18 +375,21 @@ var w2utils = (function () {
         return format.toLowerCase()
             .replace('am', type)
             .replace('pm', type)
-            .replace('hh', hour)
+            .replace('hhh', (hour < 10 ? '0' + hour : hour))
+            .replace('hh24', (h24 < 10 ? '0' + h24 : h24))
             .replace('h24', h24)
+            .replace('hh', hour)
             .replace('mm', min)
             .replace('mi', min)
             .replace('ss', sec)
             .replace(/(^|[^a-z$])h/g, '$1' + hour)    // only y's that are not preceeded by a letter
-            .replace(/(^|[^a-z$])m/g, '$1' + min)    // only y's that are not preceeded by a letter
+            .replace(/(^|[^a-z$])m/g, '$1' + min)     // only y's that are not preceeded by a letter
             .replace(/(^|[^a-z$])s/g, '$1' + sec);    // only y's that are not preceeded by a letter
     }
 
     function formatDateTime(dateStr, format) {
         var fmt;
+        if (dateStr === '' || dateStr == null || (typeof dateStr == 'object' && !dateStr.getMonth)) return '';
         if (typeof format !== 'string') {
             fmt = [this.settings.date_format, this.settings.time_format];
         } else {
@@ -907,6 +918,7 @@ w2utils.event = {
 
         if (!eventData.type) { console.log('ERROR: You must specify event type when calling .on() method of '+ this.name); return; }
         if (!handler) { console.log('ERROR: You must specify event handler function when calling .on() method of '+ this.name); return; }
+        if (!$.isArray(this.handlers)) this.handlers = [];
         this.handlers.push({ event: eventData, handler: handler });
     },
 
@@ -941,6 +953,7 @@ w2utils.event = {
         if (eventData.phase === 'before') eventData.onComplete = null;
         var args, fun, tmp;
         if (eventData.target == null) eventData.target = null;
+        if (!$.isArray(this.handlers)) this.handlers = [];
         // process events in REVERSE order
         for (var h = this.handlers.length-1; h >= 0; h--) {
             var item = this.handlers[h];
@@ -951,7 +964,7 @@ w2utils.event = {
                 eventData = $.extend({}, item.event, eventData);
                 // check handler arguments
                 args = [];
-                tmp  = RegExp(/\((.*?)\)/).exec(item.handler);
+                tmp  = new RegExp(/\((.*?)\)/).exec(item.handler);
                 if (tmp) args = tmp[1].split(/\s*,\s*/);
                 if (args.length === 2) {
                     item.handler.call(this, eventData.target, eventData); // old way for back compatibility
@@ -967,7 +980,7 @@ w2utils.event = {
             fun = this[funName];
             // check handler arguments
             args = [];
-            tmp  = RegExp(/\((.*?)\)/).exec(fun);
+            tmp  = new RegExp(/\((.*?)\)/).exec(fun);
             if (tmp) args = tmp[1].split(/\s*,\s*/);
             if (args.length === 2) {
                 fun.call(this, eventData.target, eventData); // old way for back compatibility
@@ -983,7 +996,7 @@ w2utils.event = {
             fun = eventData.object[funName];
             // check handler arguments
             args = [];
-            tmp  = RegExp(/\((.*?)\)/).exec(fun);
+            tmp  = new RegExp(/\((.*?)\)/).exec(fun);
             if (tmp) args = tmp[1].split(/\s*,\s*/);
             if (args.length === 2) {
                 fun.call(this, eventData.target, eventData); // old way for back compatibility
@@ -1013,7 +1026,6 @@ w2utils.keyboard = (function (obj) {
 
     obj.active    = active;
     obj.clear     = clear;
-    obj.register  = register;
 
     init();
     return obj;
@@ -1050,9 +1062,6 @@ w2utils.keyboard = (function (obj) {
 
     function clear () {
         w2ui_name = null;
-    }
-
-    function register () {
     }
 
 })({});
@@ -1197,6 +1206,7 @@ w2utils.keyboard = (function (obj) {
         var name = '';
         var defaults = {
             name      : null,      // it not null, then allows multiple concurent overlays
+            html      : '',        // html text to display
             align     : 'none',    // can be none, left, right, both
             left      : 0,         // offset left
             top       : 0,         // offset top
@@ -1206,18 +1216,26 @@ w2utils.keyboard = (function (obj) {
             maxWidth  : null,      // max width if any
             maxHeight : null,      // max height if any
             style     : '',        // additional style for main div
-            'class'   : '',        // additional class name for main dvi
+            'class'   : '',        // additional class name for main div
             onShow    : null,      // event on show
             onHide    : null,      // event on hide
             openAbove : false,     // show abover control
             tmp       : {}
         };
+        if (arguments.length == 1) {
+            if (typeof html == 'object') {
+                options = html; 
+            } else {
+                options = { html: html };
+            }
+        }
+        if (arguments.length == 2) options.html = html;
         if (!$.isPlainObject(options)) options = {};
         options = $.extend({}, defaults, options);
         if (options.name) name = '-' + options.name;
         // if empty then hide
         var tmp_hide;
-        if (this.length === 0 || html === '' || html == null) {
+        if (this.length === 0 || options.html === '' || options.html == null) {
             if ($('#w2ui-overlay'+ name).length > 0) {
                 tmp_hide = $('#w2ui-overlay'+ name)[0].hide;
                 if (typeof tmp_hide === 'function') tmp_hide();
@@ -1241,7 +1259,7 @@ w2utils.keyboard = (function (obj) {
         // init
         var div1 = $('#w2ui-overlay'+ name);
         var div2 = div1.find(' > div');
-        div2.html(html);
+        div2.html(options.html);
         // pick bg color of first div
         var bc  = div2.css('background-color');
         if (bc != null && bc !== 'rgba(0, 0, 0, 0)' && bc !== 'transparent') div1.css('background-color', bc);
@@ -1410,7 +1428,10 @@ w2utils.keyboard = (function (obj) {
                 id       : null,
                 text     : '',
                 style    : '',
-                hidden   : true,
+                img      : '',
+                icon     : '',
+                count    : '',
+                hidden   : false,
                 disabled : false
                 ...
             }
@@ -1450,12 +1471,14 @@ w2utils.keyboard = (function (obj) {
                     // need time so that menu first hides
                     setTimeout(function () {
                         options.onSelect({
-                            index    : index,
-                            item    : options.items[index],
+                            index : index,
+                            item  : options.items[index],
                             originalEvent: event
                         });
                     }, 10);
                 }
+                // do not uncomment (or enum search type is not working in grid)
+                // setTimeout(function () { $(document).click(); }, 50);
             };
             var html = '';
             if (options.search) {
@@ -1479,6 +1502,10 @@ w2utils.keyboard = (function (obj) {
                         // cancel tab key
                         if (event.keyCode === 9) { event.stopPropagation(); event.preventDefault(); }
                     });
+                if (options.search) {
+                    if (['text', 'password'].indexOf($(obj)[0].type) != -1 || $(obj)[0].tagName == 'texarea') return;
+                    $('#w2ui-overlay'+ name +' #menu-search').focus();                    
+                }
             }, 200);
             mresize();
             return ret;
@@ -1493,7 +1520,7 @@ w2utils.keyboard = (function (obj) {
                 cur.addClass('w2ui-selected');
                 if (options.tmp) options.tmp.contentHeight = $('#w2ui-overlay'+ name +' table').height() + (options.search ? 50 : 10);
                 if (options.tmp) options.tmp.contentWidth  = $('#w2ui-overlay'+ name +' table').width();
-                $('#w2ui-overlay'+ name)[0].resize();
+                if ($('#w2ui-overlay'+ name).length > 0) $('#w2ui-overlay'+ name)[0].resize();
                 // scroll into view
                 if (cur.length > 0) {
                     var top    = cur[0].offsetTop - 5; // 5 is margin top
@@ -1554,7 +1581,6 @@ w2utils.keyboard = (function (obj) {
                     try {
                         var re = new RegExp(prefix + search + suffix, 'i');
                         if (re.test(item.text) || item.text === '...') item.hidden = false; else item.hidden = true;
-                        if (options.applyFilter !== true) item.hidden = false;
                     } catch (e) {}
                     // do not show selected items
                     if (obj.type === 'enum' && $.inArray(item.id, ids) !== -1) item.hidden = true;
@@ -1570,9 +1596,9 @@ w2utils.keyboard = (function (obj) {
 
         function getMenuHTML () {
             if (options.spinner) {
-                return  '<table class="w2ui-drop-menu"><tr><td style="padding: 5px 0px 10px 0px; text-align: center">'+
+                return  '<table class="w2ui-drop-menu"><tr><td style="padding: 5px 10px 10px 10px; text-align: center">'+
                         '    <div class="w2ui-spinner" style="width: 18px; height: 18px; position: relative; top: 5px;"></div> '+
-                        '    <div style="display: inline-block; padding: 3px; color: #999;"> Loading...</div>'+
+                        '    <div style="display: inline-block; padding: 3px; color: #999;">'+ w2utils.lang('Loading...') +'</div>'+
                         '</td></tr></table>';
             }
             var count        = 0;
@@ -1595,12 +1621,15 @@ w2utils.keyboard = (function (obj) {
                     var imgd = '';
                     var txt = mitem.text;
                     if (typeof options.render === 'function') txt = options.render(mitem, options);
-                    if (img)  imgd = '<td><div class="w2ui-tb-image w2ui-icon '+ img +'"></div></td>';
-                    if (icon) imgd = '<td align="center"><span class="w2ui-icon '+ icon +'"></span></td>';
+                    if (img)  imgd = '<td class="menu-icon"><div class="w2ui-tb-image w2ui-icon '+ img +'"></div></td>';
+                    if (icon) imgd = '<td class="menu-icon" align="center"><span class="w2ui-icon '+ icon +'"></span></td>';
                     // render only if non-empty
                     if (typeof txt !== 'undefined' && txt !== '' && !(/^-+$/.test(txt))) {
                         var bg = (count % 2 === 0 ? 'w2ui-item-even' : 'w2ui-item-odd');
                         if (options.altRows !== true) bg = '';
+                        var colspan = 1;
+                        if (imgd == '') colspan++;
+                        if (mitem.count == null) colspan++;
                         menu_html +=
                             '<tr index="'+ f + '" style="'+ (mitem.style ? mitem.style : '') +'" '+
                             '        class="'+ bg +' '+ (options.index === f ? 'w2ui-selected' : '') + ' ' + (mitem.disabled === true ? 'w2ui-disabled' : '') +'"'+
@@ -1610,12 +1639,13 @@ w2utils.keyboard = (function (obj) {
                             '               $(\'#w2ui-overlay'+ name +'\').remove(); '+
                             '               $.fn.w2menuHandler(event, \''+ f +'\');">'+
                                 imgd +
-                            '    <td '+ (imgd == '' ? 'colspan="2"' : '') +'>'+ txt +'</td>'+
+                            '   <td class="menu-text" colspan="'+ colspan +'">'+ txt +'</td>'+
+                            '   <td class="menu-count">'+ (mitem.count != null ? '<span>' + mitem.count + '</span>' : '') + '</td>' +
                             '</tr>';
                         count++;
                     } else {
                         // horizontal line
-                        menu_html += '<tr><td colspan="2" style="padding: 6px"><div style="border-top: 1px solid silver;"></div></td></tr>';
+                        menu_html += '<tr><td colspan="2" style="padding: 6px; pointer-events: none"><div style="border-top: 1px solid silver;"></div></td></tr>';
                     }
                 }
                 options.items[f] = mitem;
@@ -1652,41 +1682,18 @@ w2utils.keyboard = (function (obj) {
 *   - add showExtra, KickIn Infinite scroll when so many records
 *   - after edit stay on the same record option
 *   - allow render: function to be filters
-*   - column.hidable - prevents column from being hidden in columnOnOff
+*   - if supplied array of ids, get should return array of records
+*   - row drag and drop has bugs
 *
-* == 1.4 changes
-*   - for search fields one should be able to pass w2field options
-*   - add enum to advanced search fields
-*   - editable fields -> LIST type is not working
-*   - search-logic -> searchLogic
-*   - new: refreshRow(recid) - should it be part of refresh?
-*   - new: refreshCell(recid, field) - should it be part of refresh?
-*   - removed: getSelection().removeAllRanges() - see https://github.com/vitmalina/w2ui/issues/323
-*   - new: reorderColumns
-*   - removed name from the POST
-*   - rename: markSearchResults -> markSearch
-*   - refactored inline editing
-*   - new: getCellValue(ind, col_ind, [summary])
-*   - refactored selection
-*   - removed: record.selected
-*   - new: nextCell, prevCell, nextRow, prevRow
-*   - new: editChange(el, index, column, event)
-*   - new: method - overwrite default ajax method (see also w2utils.settings.dataType)
-*   - rename: onSave -> onSubmit, onSaved -> onSave, just like in the form
-*   - new: recid - if id of the data is different from recid
-*   - new: parser - to converd data received from the server
-*   - change: rec.changes = {} and removed rec.changed
-*   - record.style can be a string or an object (for cell formatting)
-*   - col.resizable = true by default
-*   - new: prepareData();
-*   - context menu similar to sidebar's
-*   - find will return array or recids not objects
-*   - added render = 'toggle'
-*   - get rid of this.buffered
-*   - added routeData
-*   - save grid state into localStorage and restore
-*   - added user-select with alt key
-*   - added grid.show.skipRecords
+* == 1.5 changes
+*   - $('#grid').w2grid() - if called w/o argument then it returns grid object
+*   - added statusRange     : true,
+*           statusBuffered  : false,
+*           statusRecordID  : true,
+*           statusSelection : true,
+*           statusResponse  : true,
+*           statusSort      : true,
+*           statusSearch    : true,
 *
 ************************************************************************/
 
@@ -1699,11 +1706,11 @@ w2utils.keyboard = (function (obj) {
         this.header       = '';
         this.url          = '';
         this.routeData    = {};       // data for dynamic routes
-        this.columns      = [];       // { field, caption, size, attr, render, hidden, gridMinWidth, [editable: {type, inTag, outTag, style, items}] }
+        this.columns      = [];       // { field, caption, size, attr, render, hidden, gridMinWidth, editable }
         this.columnGroups = [];       // { span: int, caption: 'string', master: true/false }
         this.records      = [];       // { recid: int(requied), field1: 'value1', ... fieldN: 'valueN', style: 'string', editable: true/false, summary: true/false, changes: object }
         this.summary      = [];       // arry of summary records, same structure as records array
-        this.searches     = [];       // { type, caption, field, inTag, outTag, default, items, hidden }
+        this.searches     = [];       // { type, caption, field, inTag, outTag, hidden }
         this.searchData   = [];
         this.sortData     = [];
         this.postData     = {};
@@ -1725,8 +1732,15 @@ w2utils.keyboard = (function (obj) {
             toolbarEdit     : false,
             toolbarDelete   : false,
             toolbarSave     : false,
-            selectionBorder : true,
+            statusRange     : true,
+            statusBuffered  : false,
+            statusRecordID  : true,
+            statusSelection : true,
+            statusResponse  : true,
+            statusSort      : true,
+            statusSearch    : true,
             recordTitles    : true,
+            selectionBorder : true,
             skipRecords     : true
         };
 
@@ -1742,15 +1756,15 @@ w2utils.keyboard = (function (obj) {
         this.reorderRows    = false;
         this.markSearch     = true;
 
-        this.total     = 0;     // server total
-        this.limit     = 100;
-        this.offset    = 0;     // how many records to skip (for infinite scroll) when pulling from server
-        this.style     = '';
-        this.ranges    = [];
-        this.menu      = [];
-        this.method;            // if defined, then overwrited ajax method
-        this.recid;
-        this.parser;
+        this.total   = 0;     // server total
+        this.limit   = 100;
+        this.offset  = 0;     // how many records to skip (for infinite scroll) when pulling from server
+        this.style   = '';
+        this.ranges  = [];
+        this.menu    = [];
+        this.method  = null;         // if defined, then overwrited ajax method
+        this.recid   = null;
+        this.parser  = null;
 
         // events
         this.onAdd              = null;
@@ -1816,10 +1830,6 @@ w2utils.keyboard = (function (obj) {
             edit_col    : null
         };
 
-        this.isIOS = (navigator.userAgent.toLowerCase().indexOf('iphone') != -1 ||
-            navigator.userAgent.toLowerCase().indexOf('ipod') != -1 ||
-            navigator.userAgent.toLowerCase().indexOf('ipad') != -1) ? true : false;
-
         $.extend(true, this, w2obj.grid, options);
     };
 
@@ -1827,7 +1837,7 @@ w2utils.keyboard = (function (obj) {
     // -- Registers as a jQuery plugin
 
     $.fn.w2grid = function(method) {
-        if (typeof method === 'object' || !method ) {
+        if ($.isPlainObject(method)) {
             // check name parameter
             if (!w2utils.checkName(method, 'w2grid')) return;
             // remember items
@@ -1879,14 +1889,17 @@ w2utils.keyboard = (function (obj) {
             w2ui[object.name] = object;
             return object;
 
-        } else if (w2ui[$(this).attr('name')]) {
-            var obj = w2ui[$(this).attr('name')];
-            obj[method].apply(obj, Array.prototype.slice.call(arguments, 1));
-            return this;
         } else {
-            console.log('ERROR: Method ' +  method + ' does not exist on jQuery.w2grid');
+            var obj = w2ui[$(this).attr('name')];
+            if (!obj) return null;
+            if (arguments.length > 0) {
+                if (obj[method]) obj[method].apply(obj, Array.prototype.slice.call(arguments, 1));
+                return this;
+            } else {
+                return obj;
+            }
         }
-    }
+    };
 
     // ====================================================
     // -- Implementation of core functionality
@@ -1902,17 +1915,17 @@ w2utils.keyboard = (function (obj) {
 
         // for easy button overwrite
         buttons: {
-            'reload'   : { type: 'button', id: 'w2ui-reload', img: 'icon-reload', hint: 'Reload data in the list' },
-            'columns'  : { type: 'drop', id: 'w2ui-column-on-off', img: 'icon-columns', hint: 'Show/hide columns', arrow: false, html: '' },
+            'reload'   : { type: 'button', id: 'w2ui-reload', icon: 'w2ui-icon-reload', hint: 'Reload data in the list' },
+            'columns'  : { type: 'drop', id: 'w2ui-column-on-off', icon: 'w2ui-icon-columns', hint: 'Show/hide columns', arrow: false, html: '' },
             'search'   : { type: 'html',   id: 'w2ui-search',
                             html: '<div class="w2ui-icon icon-search-down w2ui-search-down" title="'+ 'Select Search Field' +'" '+
                                   'onclick="var obj = w2ui[$(this).parents(\'div.w2ui-grid\').attr(\'name\')]; obj.searchShowFields();"></div>'
                           },
             'search-go': { type: 'check',  id: 'w2ui-search-advanced', caption: 'Search...', hint: 'Open Search Fields' },
-            'add'      : { type: 'button', id: 'w2ui-add', caption: 'Add New', hint: 'Add new record', img: 'icon-add' },
-            'edit'     : { type: 'button', id: 'w2ui-edit', caption: 'Edit', hint: 'Edit selected record', img: 'icon-edit', disabled: true },
-            'delete'   : { type: 'button', id: 'w2ui-delete', caption: 'Delete', hint: 'Delete selected records', img: 'icon-delete', disabled: true },
-            'save'     : { type: 'button', id: 'w2ui-save', caption: 'Save', hint: 'Save changed records', img: 'icon-save' }
+            'add'      : { type: 'button', id: 'w2ui-add', caption: 'Add New', hint: 'Add new record', icon: 'w2ui-icon-plus' },
+            'edit'     : { type: 'button', id: 'w2ui-edit', caption: 'Edit', hint: 'Edit selected record', icon: 'w2ui-icon-pencil', disabled: true },
+            'delete'   : { type: 'button', id: 'w2ui-delete', caption: 'Delete', hint: 'Delete selected records', icon: 'w2ui-icon-cross', disabled: true },
+            'save'     : { type: 'button', id: 'w2ui-save', caption: 'Save', hint: 'Save changed records', icon: 'w2ui-icon-check' }
         },
 
         add: function (record) {
@@ -1972,16 +1985,28 @@ w2utils.keyboard = (function (obj) {
             } else { // find record to update
                 var ind = this.get(recid, true);
                 if (ind == null) return false;
-                $.extend(true, this.records[ind], record);
+                var isSummary = (this.records[ind] && this.records[ind].recid == recid ? false : true);
+                if (isSummary) {
+                    $.extend(true, this.summary[ind], record);
+                } else {
+                    $.extend(true, this.records[ind], record);
+                }
                 if (noRefresh !== true) this.refreshRow(recid); // refresh only that record
             }
             return true;
         },
 
         get: function (recid, returnIndex) {
+            // search records
             for (var i = 0; i < this.records.length; i++) {
                 if (this.records[i].recid == recid) {
                     if (returnIndex === true) return i; else return this.records[i];
+                }
+            }
+            // search summary
+            for (var i = 0; i < this.summary.length; i++) {
+                if (this.summary[i].recid == recid) {
+                    if (returnIndex === true) return i; else return this.summary[i];
                 }
             }
             return null;
@@ -2191,11 +2216,13 @@ w2utils.keyboard = (function (obj) {
             for (var s in this.sortData) {
                 var column = this.getColumn(this.sortData[s].field); 
                 if (!column) return;
-                if (column.render && ['date', 'age'].indexOf(column.render) != -1) {
-                    this.sortData[s]['field_'] = column.field + '_';
-                }
-                if (column.render && ['time'].indexOf(column.render) != -1) {
-                    this.sortData[s]['field_'] = column.field + '_';
+                if (typeof column.render == 'string') {
+                    if (['date', 'age'].indexOf(column.render.split(':')[0]) != -1) {
+                        this.sortData[s]['field_'] = column.field + '_';
+                    }
+                    if (['time'].indexOf(column.render.split(':')[0]) != -1) {
+                        this.sortData[s]['field_'] = column.field + '_';
+                    }
                 }
             }
             // process sort
@@ -2223,7 +2250,11 @@ w2utils.keyboard = (function (obj) {
                 return ret;
             });
             time = (new Date()).getTime() - time;
-            if (silent !== true) setTimeout(function () { obj.status('Sorting took ' + time/1000 + ' sec'); }, 10);
+            if (silent !== true && obj.show.statusSort) {
+                setTimeout(function () { 
+                    obj.status(w2utils.lang('Sorting took') + ' ' + time/1000 + ' ' + w2utils.lang('sec')); 
+                }, 10);
+            }
             return time;
         },
 
@@ -2322,7 +2353,11 @@ w2utils.keyboard = (function (obj) {
                 this.total = this.last.searchIds.length;
             }
             time = (new Date()).getTime() - time;
-            if (silent !== true) setTimeout(function () { obj.status('Search took ' + time/1000 + ' sec'); }, 10);
+            if (silent !== true && obj.show.statusSearch) {
+                setTimeout(function () { 
+                    obj.status(w2utils.lang('Search took') + ' ' + time/1000 + ' ' + w2utils.lang('sec')); 
+                }, 10);
+            }
             return time;
         },
 
@@ -2893,7 +2928,7 @@ w2utils.keyboard = (function (obj) {
                                 type     : search.type,
                                 operator : op,
                                 value    : val
-                            }
+                            };
                             searchData.push(tmp);
                         }
                     }
@@ -2913,6 +2948,11 @@ w2utils.keyboard = (function (obj) {
                     var data   = field[f];
                     var search = this.getSearch(data.field);
                     if (search == null) search = { type: 'text', operator: 'contains' };
+                    if ($.isArray(data.value)) {
+                        for (var v in data.value) {
+                            if (typeof data.value[v] == 'string') data.value[v] = data.value[v].toLowerCase();
+                        }
+                    }
                     // merge current field and search if any
                     searchData.push($.extend(true, {}, search, data));
                 }
@@ -2971,7 +3011,7 @@ w2utils.keyboard = (function (obj) {
         searchClose: function () {
             if (!this.box) return;
             if (this.searches.length == 0) return;
-            if (this.toolbar) this.toolbar.uncheck('w2ui-search-advanced')
+            if (this.toolbar) this.toolbar.uncheck('w2ui-search-advanced');
             // hide search
             if ($('#w2ui-overlay-searches-'+ this.name +' .w2ui-grid-searches').length > 0) {
                 $().w2overlay('', { name: 'searches-'+ this.name });
@@ -2989,7 +3029,7 @@ w2utils.keyboard = (function (obj) {
                 } else {
                     if (this.searches[s].hidden === true) continue;
                 }
-                html += '<tr '+ (this.isIOS ? 'onTouchStart' : 'onClick') +'="w2ui[\''+ this.name +'\'].initAllField(\''+ search.field +'\')">'+
+                html += '<tr '+ (w2utils.isIOS ? 'onTouchStart' : 'onClick') +'="w2ui[\''+ this.name +'\'].initAllField(\''+ search.field +'\')">'+
                         '    <td><input type="radio" tabIndex="-1" '+ (search.field == this.last.field ? 'checked' : '') +'></td>'+
                         '    <td>'+ search.caption +'</td>'+
                         '</tr>';
@@ -3188,7 +3228,7 @@ w2utils.keyboard = (function (obj) {
                     more.find('td').html('<div>'+ w2utils.lang('Load') + ' ' + obj.limit + ' ' + w2utils.lang('More') + '...</div>');
                 }
             }
-            if (this.last.xhr) try { this.last.xhr.abort(); } catch (e) {};
+            if (this.last.xhr) try { this.last.xhr.abort(); } catch (e) {}
             // URL
             var url = (typeof eventData.url != 'object' ? eventData.url : eventData.url.get);
             if (params.cmd == 'save-records' && typeof eventData.url == 'object')   url = eventData.url.save;
@@ -3198,7 +3238,7 @@ w2utils.keyboard = (function (obj) {
                 var info  = w2utils.parseRoute(url);
                 if (info.keys.length > 0) {
                     for (var k = 0; k < info.keys.length; k++) {
-                        if (!obj.routeData[info.keys[k].name]) continue;
+                        if (obj.routeData[info.keys[k].name] == null) continue;
                         url = url.replace((new RegExp(':'+ info.keys[k].name, 'g')), obj.routeData[info.keys[k].name]);
                     }
                 }
@@ -3259,7 +3299,9 @@ w2utils.keyboard = (function (obj) {
         requestComplete: function(status, cmd, callBack) {
             var obj = this;
             this.unlock();
-            setTimeout(function () { obj.status(w2utils.lang('Server Response') + ' ' + ((new Date()).getTime() - obj.last.xhr_start)/1000 +' ' + w2utils.lang('sec')); }, 10);
+            setTimeout(function () { 
+                if (obj.show.statusResponse) obj.status(w2utils.lang('Server Response') + ' ' + ((new Date()).getTime() - obj.last.xhr_start)/1000 +' ' + w2utils.lang('sec')); 
+            }, 10);
             this.last.pull_more    = false;
             this.last.pull_refresh = true;
 
@@ -3457,6 +3499,10 @@ w2utils.keyboard = (function (obj) {
             if (typeof col.render == 'string' && ['number', 'int', 'float', 'money', 'percent'].indexOf(col.render.split(':')[0]) != -1) {
                 addStyle += 'text-align: right;';
             }
+            // mormalize items
+            if (edit.items.length > 0 && !$.isPlainObject(edit.items[0])) {
+                edit.items = w2obj.field.prototype.normMenu(edit.items);
+            }
             if (edit.type == 'select') {
                 var html = '';
                 for (var i in edit.items) {
@@ -3483,7 +3529,7 @@ w2utils.keyboard = (function (obj) {
                 if (value == null) el.find('input').val(val != 'object' ? val : '');
                 // init w2field
                 var input = el.find('input').get(0);
-                $(input).w2field(edit.type, $.extend(edit, { selected: val }))
+                $(input).w2field(edit.type, $.extend(edit, { selected: val }));
                 // add blur listener
                 setTimeout(function () {
                     var tmp = input;
@@ -3510,7 +3556,7 @@ w2utils.keyboard = (function (obj) {
                                 var next_rec = recid;
                                 var next_col = event.shiftKey ? obj.prevCell(column, true) : obj.nextCell(column, true);
                                 // next or prev row
-                                if (next_col === false) {
+                                if (next_col == null) {
                                     var tmp = event.shiftKey ? obj.prevRow(index) : obj.nextRow(index);
                                     if (tmp != null && tmp != index) {
                                         next_rec = obj.records[tmp].recid;
@@ -3526,7 +3572,7 @@ w2utils.keyboard = (function (obj) {
 
                                 }
                                 if (next_rec === false) next_rec = recid;
-                                if (next_col === false) next_col = column;
+                                if (next_col == null) next_col = column;
                                 // init new or same record
                                 this.blur();
                                 setTimeout(function () {
@@ -3950,7 +3996,7 @@ w2utils.keyboard = (function (obj) {
                         obj.collapse(recid, event);
                     } else {
                         var prev = obj.prevCell(columns[0]);
-                        if (prev !== false) {
+                        if (prev != null) {
                             if (shiftKey && obj.multiSelect) {
                                 if (tmpUnselect()) return;
                                 var tmp    = [];
@@ -3990,7 +4036,7 @@ w2utils.keyboard = (function (obj) {
                         obj.expand(recid, event);
                     } else {
                         var next = obj.nextCell(columns[columns.length-1]);
-                        if (next !== false) {
+                        if (next !== null) {
                             if (shiftKey && key == 39 && obj.multiSelect) {
                                 if (tmpUnselect()) return;
                                 var tmp    = [];
@@ -4150,15 +4196,22 @@ w2utils.keyboard = (function (obj) {
                     }
                     break;
 
-                case 86: // v - paste
+                // copy & paste
+
+                case 17: // ctrl key
+                case 91: // cmd key
                     if (empty) break;
-                    if (event.ctrlKey || event.metaKey) {
-                        $('body').append('<textarea id="_tmp_copy_data" style="position: absolute; top: -100px; height: 1px;"></textarea>');
-                        $('#_tmp_copy_data').focus();
-                        setTimeout(function () {
-                            obj.paste($('#_tmp_copy_data').val());
-                            $('#_tmp_copy_data').remove();
-                        }, 50); // need timer to allow paste
+                    var text = obj.copy();
+                    $('body').append('<textarea id="_tmp_copy_data" '+
+                        '   onpaste="var obj = this; setTimeout(function () { w2ui[\''+ obj.name + '\'].paste(obj.value); }, 1);" '+
+                        '   onkeydown="w2ui[\''+ obj.name +'\'].keydown(event)"'+
+                        '   style="position: absolute; top: -100px; height: 1px; width: 1px">'+ text +'</textarea>');
+                    $('#_tmp_copy_data').focus().select();
+                    // remove _tmp_copy_data textarea
+                    $(document).on('keyup', tmp_key_down);
+                    function tmp_key_down() { 
+                        $('#_tmp_copy_data').remove(); 
+                        $(document).off('keyup', tmp_key_down); 
                     }
                     break;
 
@@ -4166,14 +4219,6 @@ w2utils.keyboard = (function (obj) {
                     if (empty) break;
                     if (event.ctrlKey || event.metaKey) {
                         setTimeout(function () { obj["delete"](true); }, 100);
-                    }
-                case 67: // c - copy
-                    if (empty) break;
-                    if (event.ctrlKey || event.metaKey) {
-                        var text = obj.copy();
-                        $('body').append('<textarea id="_tmp_copy_data" style="position: absolute; top: -100px; height: 1px;">'+ text +'</textarea>');
-                        $('#_tmp_copy_data').focus().select();
-                        setTimeout(function () { $('#_tmp_copy_data').remove(); }, 50);
                     }
                     break;
             }
@@ -4282,6 +4327,7 @@ w2utils.keyboard = (function (obj) {
         contextMenu: function (recid, event) {
             var obj = this;
             if (obj.last.userSelect == 'text') return;
+            if (typeof event == 'undefined') event = { offsetX: 0, offsetY: 0, target: $('#grid_'+ obj.name +'_rec_'+ recid)[0] };
             if (typeof event.offsetX === 'undefined') {
                 event.offsetX = event.layerX - event.target.offsetLeft;
                 event.offsetY = event.layerY - event.target.offsetTop;
@@ -4473,12 +4519,21 @@ w2utils.keyboard = (function (obj) {
                     text += '\n';
                 }
             } else { // row copy
+                // copy headers
+                for (var c in this.columns) {
+                    var col = this.columns[c];
+                    if (col.hidden === true) continue;
+                    text += '"' + w2utils.stripTags(col.caption ? col.caption : col.field) + '"\t';
+                }
+                text = text.substr(0, text.length-1); // remove last \t
+                text += '\n';
+                // copy selected text                
                 for (var s in sel) {
                     var ind = this.get(sel[s], true);
                     for (var c in this.columns) {
                         var col = this.columns[c];
                         if (col.hidden === true) continue;
-                        text += w2utils.stripTags(this.getCellHTML(ind, c)) + '\t';
+                        text += '"' + w2utils.stripTags(this.getCellHTML(ind, c)) + '"\t';
                     }
                     text = text.substr(0, text.length-1); // remove last \t
                     text += '\n';
@@ -4553,24 +4608,20 @@ w2utils.keyboard = (function (obj) {
             // resize
             obj.resizeBoxes();
             obj.resizeRecords();
-            // init editable
-            // $('#grid_'+ obj.name + '_records .w2ui-editable input').each(function (index, el) {
-            //     var column = obj.columns[$(el).attr('column')];
-            //     if (column && column.editable) $(el).w2field(column.editable);
-            // });
             // event after
             this.trigger($.extend(eventData, { phase: 'after' }));
             return (new Date()).getTime() - time;
         },
 
         refreshCell: function (recid, field) {
-            var index    = this.get(recid, true);
-            var col_ind  = this.getColumn(field, true);
-            var rec      = this.records[index];
-            var col      = this.columns[col_ind];
-            var cell     = $('#grid_'+ this.name + '_rec_'+ recid +' [col='+ col_ind +']');
+            var index     = this.get(recid, true);
+            var isSummary = (this.records[index] && this.records[index].recid == recid ? false : true);
+            var col_ind   = this.getColumn(field, true);
+            var rec       = (isSummary ? this.summary[index] : this.records[index]);
+            var col       = this.columns[col_ind];
+            var cell      = $('#grid_'+ this.name + '_rec_'+ recid +' [col='+ col_ind +']');
             // set cell html and changed flag
-            cell.html(this.getCellHTML(index, col_ind));
+            cell.html(this.getCellHTML(index, col_ind, isSummary));
             if (rec.changes && typeof rec.changes[col.field] != 'undefined') {
                 cell.addClass('w2ui-changed');
             } else {
@@ -4583,12 +4634,13 @@ w2utils.keyboard = (function (obj) {
             if (tr.length != 0) {
                 var ind  = this.get(recid, true);
                 var line = tr.attr('line');
+                var isSummary = (this.records[ind] && this.records[ind].recid == recid ? false : true);
                 // if it is searched, find index in search array
                 var url = (typeof this.url != 'object' ? this.url : this.url.get);
                 if (this.searchData.length > 0 && !url) for (var s in this.last.searchIds) if (this.last.searchIds[s] == ind) ind = s;
-                $(tr).replaceWith(this.getRecordHTML(ind, line));
+                $(tr).replaceWith(this.getRecordHTML(ind, line, isSummary));
+                if (isSummary) this.resize();
             }
-
         },
 
         refresh: function () {
@@ -4984,6 +5036,7 @@ w2utils.keyboard = (function (obj) {
             for (var c in this.columns) {
                 var col = this.columns[c];
                 var tmp = this.columns[c].caption;
+                if (col.hideable === false) continue;
                 if (!tmp && this.columns[c].hint) tmp = this.columns[c].hint;
                 if (!tmp) tmp = '- column '+ (parseInt(c) + 1) +' -';
                 col_html += '<tr>'+
@@ -5137,7 +5190,8 @@ w2utils.keyboard = (function (obj) {
                     offsets = _dragData.offsets,
                     lastWidth = $( '.w2ui-head:not(.w2ui-head-last)' ).width();
 
-                _dragData.targetInt = targetIntersection( cursorX, offsets, lastWidth );
+                _dragData.targetInt = Math.max(_dragData.numberPreColumnsPresent,targetIntersection( cursorX, offsets, lastWidth ));
+
                 markIntersection( _dragData.targetInt );
                 trackGhost( cursorX, cursorY );
             }
@@ -5149,7 +5203,6 @@ w2utils.keyboard = (function (obj) {
                     target,
                     selected,
                     columnConfig,
-                    columnNum,
                     targetColumn,
                     ghosts = $( '.w2ui-grid-ghost' );
 
@@ -5159,12 +5212,8 @@ w2utils.keyboard = (function (obj) {
 
                 selected = obj.columns[ _dragData.originalPos ];
                 columnConfig = obj.columns;
-                columnNum = ( _dragData.targetInt >= obj.columns.length ) ? obj.columns.length - 1 :
-                        ( _dragData.targetInt < _dragData.originalPos ) ? _dragData.targetInt : _dragData.targetInt - 1;
-                target = ( _dragData.numberPreColumnsPresent ) ?
-                    ( _dragData.targetInt - _dragData.numberPreColumnsPresent < 0 ) ? 0 : _dragData.targetInt - _dragData.numberPreColumnsPresent :
-                    _dragData.targetInt;
-                targetColumn =  $( '.w2ui-head[col="' + columnNum + '"]' );
+                targetColumn =  $( _dragData.columns[ Math.min(_dragData.lastInt, _dragData.columns.length - 1) ] );
+                target = (_dragData.lastInt < _dragData.columns.length) ? parseInt(targetColumn.attr('col')) : columnConfig.length;
 
                 if ( target !== _dragData.originalPos + 1 && target !== _dragData.originalPos && targetColumn && targetColumn.length ) {
                     $( _dragData.ghost ).animate({
@@ -5180,6 +5229,7 @@ w2utils.keyboard = (function (obj) {
 
                     columnConfig.splice( target, 0, $.extend( {}, selected ) );
                     columnConfig.splice( columnConfig.indexOf( selected ), 1);
+
                 } else {
                     $( _dragData.ghost ).remove();
                     ghosts.remove();
@@ -5222,8 +5272,8 @@ w2utils.keyboard = (function (obj) {
                         $( _dragData.columns[ _dragData.columns.length - 1 ] ).addClass('w2ui-col-intersection');
                     } else if ( intersection <= _dragData.numberPreColumnsPresent ) {
                         //if the current intersection is on the column numbers place marker on first available column only
-                        $( '.w2ui-head[col="0"]' ).prepend( _dragData.marker.addClass( 'left' ).removeClass( 'right' ) ).css({ position: 'relative' });
-                        $( '.w2ui-head[col="0"]').prev().addClass('w2ui-col-intersection');
+                        $( _dragData.columns[ _dragData.numberPreColumnsPresent ] ).prepend( _dragData.marker.addClass( 'left' ).removeClass( 'right' ) ).css({ position: 'relative' });
+                        $( _dragData.columns[ _dragData.numberPreColumnsPresent ] ).prev().addClass('w2ui-col-intersection');
                     } else {
                         //otherwise prepend the marker to the targeted column and append it to the previous column
                         $( _dragData.columns[intersection] ).children( 'div:last' ).prepend( _dragData.marker.addClass( 'left' ).removeClass( 'right' ) );
@@ -5335,6 +5385,7 @@ w2utils.keyboard = (function (obj) {
                         '    <td>'+
                         '        <input id="grid_'+ this.name +'_search_all" class="w2ui-search-all" '+
                         '            placeholder="'+ this.last.caption +'" value="'+ this.last.search +'"'+
+                        '            onkeydown="if (event.keyCode == 13 && w2utils.isIE) this.onchange();"'+
                         '            onchange="'+
                         '                var val = this.value; '+
                         '                var fld = $(this).data(\'w2field\'); '+
@@ -5484,7 +5535,7 @@ w2utils.keyboard = (function (obj) {
                         // reset
                         obj.last.tmp.x = event.screenX;
                         obj.last.tmp.y = event.screenY;
-                    }
+                    };
                     var mouseUp = function (event) {
                         delete obj.resizing;
                         $(document).off('mousemove', 'body');
@@ -5492,7 +5543,7 @@ w2utils.keyboard = (function (obj) {
                         obj.resizeRecords();
                         // event before
                         obj.trigger($.extend(eventData, { phase: 'after', originalEvent: event }));
-                    }
+                    };
                     $(document).on('mousemove', 'body', mouseMove);
                     $(document).on('mouseup', 'body', mouseUp);
                 })
@@ -5625,7 +5676,7 @@ w2utils.keyboard = (function (obj) {
                         if (this.show.selectColumn) html += '<td class="w2ui-grid-data w2ui-col-select"></td>';
                         if (this.show.expandColumn) html += '<td class="w2ui-grid-data w2ui-col-expand"></td>';
                         var j = 0;
-                        while (true && this.columns.length > 0) {
+                        while (this.columns.length > 0) {
                             var col = this.columns[j];
                             if (col.hidden) { j++; if (typeof this.columns[j] == 'undefined') break; else continue; }
                             html += '<td class="w2ui-grid-data" '+ (typeof col.attr != 'undefined' ? col.attr : '') +' col="'+ j +'"></td>';
@@ -5870,7 +5921,7 @@ w2utils.keyboard = (function (obj) {
         initOperator: function (el, search_ind) {
             var obj     = this;
             var search  = obj.searches[search_ind];
-             var range  = $('#grid_'+ obj.name + '_range_'+ search_ind);
+            var range   = $('#grid_'+ obj.name + '_range_'+ search_ind);
             var fld1    = $('#grid_'+ obj.name +'_field_'+ search_ind);
             var fld2    = fld1.parent().find('span input');
             if ($(el).val() == 'in' || $(el).val() == 'not in') { fld1.w2field('clear'); } else { fld1.w2field(search.type); }
@@ -5921,7 +5972,7 @@ w2utils.keyboard = (function (obj) {
                         if (search.type == 'list') options.selected = {};
                         if (search.type == 'enum') options.selected = [];
                         if (sdata) options.selected = sdata.value;
-                        $('#grid_'+ this.name +'_field_'+s).w2field(search.type, options);
+                        $('#grid_'+ this.name +'_field_'+s).w2field(search.type, $.extend({ openOnFocus: true }, options));
                         if (search.type == 'combo') {
                             $('#grid_'+ this.name +'_operator_'+s).val('begins');
                         }
@@ -6014,8 +6065,8 @@ w2utils.keyboard = (function (obj) {
                         var sortStyle = '';
                         for (var si in obj.sortData) {
                             if (obj.sortData[si].field == col.field) {
-                                if (RegExp('asc', 'i').test(obj.sortData[si].direction))  sortStyle = 'w2ui-sort-up';
-                                if (RegExp('desc', 'i').test(obj.sortData[si].direction)) sortStyle = 'w2ui-sort-down';
+                                if (new RegExp('asc', 'i').test(obj.sortData[si].direction))  sortStyle = 'w2ui-sort-up';
+                                if (new RegExp('desc', 'i').test(obj.sortData[si].direction)) sortStyle = 'w2ui-sort-down';
                             }
                         }
                         var resizer = "";
@@ -6083,8 +6134,8 @@ w2utils.keyboard = (function (obj) {
                     var sortStyle = '';
                     for (var si in obj.sortData) {
                         if (obj.sortData[si].field == col.field) {
-                            if (RegExp('asc', 'i').test(obj.sortData[si].direction))  sortStyle = 'w2ui-sort-up';
-                            if (RegExp('desc', 'i').test(obj.sortData[si].direction)) sortStyle = 'w2ui-sort-down';
+                            if (new RegExp('asc', 'i').test(obj.sortData[si].direction))  sortStyle = 'w2ui-sort-up';
+                            if (new RegExp('desc', 'i').test(obj.sortData[si].direction)) sortStyle = 'w2ui-sort-down';
                         }
                     }
                     if (colg['master'] !== true || master) { // grouping of columns
@@ -6166,8 +6217,9 @@ w2utils.keyboard = (function (obj) {
             if (t1 > buffered) t1 = buffered;
             if (t2 > buffered) t2 = buffered;
             var url = (typeof this.url != 'object' ? this.url : this.url.get);
-            $('#grid_'+ this.name + '_footer .w2ui-footer-right').html(w2utils.formatNumber(this.offset + t1) + '-' + w2utils.formatNumber(this.offset + t2) + ' ' + w2utils.lang('of') + ' ' +    w2utils.formatNumber(this.total) +
-                    (url ? ' ('+ w2utils.lang('buffered') + ' '+ w2utils.formatNumber(buffered) + (this.offset > 0 ? ', skip ' + w2utils.formatNumber(this.offset) : '') + ')' : '')
+            $('#grid_'+ this.name + '_footer .w2ui-footer-right').html(
+                (obj.show.statusRange ? w2utils.formatNumber(this.offset + t1) + '-' + w2utils.formatNumber(this.offset + t2) + ' ' + w2utils.lang('of') + ' ' +    w2utils.formatNumber(this.total) : '') +
+                (url && obj.show.statusBuffered ? ' ('+ w2utils.lang('buffered') + ' '+ w2utils.formatNumber(buffered) + (this.offset > 0 ? ', skip ' + w2utils.formatNumber(this.offset) : '') + ')' : '')
             );
             // only for local data source, else no extra records loaded
             if (!url && (!this.fixedBody || this.total <= 300)) return;
@@ -6237,7 +6289,9 @@ w2utils.keyboard = (function (obj) {
             // load more if needed
             var s = Math.floor(records[0].scrollTop / this.recordHeight);
             var e = s + Math.floor(records.height() / this.recordHeight);
-            if (e + 10 > buffered && this.last.pull_more !== true && buffered < this.total - this.offset) {
+            // --- see https://github.com/vitmalina/w2ui/issues/596
+            // if (e + 10 > buffered && this.last.pull_more !== true && buffered < this.total - this.offset) {
+            if (e + 10 > buffered && this.last.pull_more !== true && buffered < this.total - this.last.xhr_offset) {
                 if (this.autoLoad === true) {
                     this.last.pull_more = true;
                     this.last.xhr_offset += this.limit;
@@ -6320,7 +6374,7 @@ w2utils.keyboard = (function (obj) {
             rec_html += '<tr id="grid_'+ this.name +'_rec_'+ record.recid +'" recid="'+ record.recid +'" line="'+ lineNum +'" '+
                 ' class="'+ (lineNum % 2 == 0 ? 'w2ui-even' : 'w2ui-odd') + (isRowSelected && this.selectType == 'row' ? ' w2ui-selected' : '') + (record.expanded === true ? ' w2ui-expanded' : '') + '" ' +
                 (summary !== true ?
-                    (this.isIOS ?
+                    (w2utils.isIOS ?
                         '    onclick  = "w2ui[\''+ this.name +'\'].dblClick(\''+ record.recid +'\', event);"'
                         :
                         '    onclick  = "w2ui[\''+ this.name +'\'].click(\''+ record.recid +'\', event);"'+
@@ -6459,7 +6513,7 @@ w2utils.keyboard = (function (obj) {
                         if (typeof col.title == 'function') title = col.title.call(this, record, ind, col_ind);
                         if (typeof col.title == 'string')   title = col.title;
                     }
-                    var data = '<div title="'+ title +'" style="'+ addStyle +'">'+ data +'</div>';
+                    var data = '<div title="'+ w2utils.stripTags(title) +'" style="'+ addStyle +'">'+ data +'</div>';
                 }
             }
             if (data == null || typeof data == 'undefined') data = '';
@@ -6467,9 +6521,9 @@ w2utils.keyboard = (function (obj) {
         },
 
         getCellValue: function (ind, col_ind, summary) {
-            var col      = this.columns[col_ind];
-            var record     = (summary !== true ? this.records[ind] : this.summary[ind]);
-            var data     = this.parseField(record, col.field);
+            var col    = this.columns[col_ind];
+            var record = (summary !== true ? this.records[ind] : this.summary[ind]);
+            var data   = this.parseField(record, col.field);
             if (record.changes && typeof record.changes[col.field] != 'undefined') data = record.changes[col.field];
             if (data == null || typeof data == 'undefined') data = '';
             return data;
@@ -6491,10 +6545,14 @@ w2utils.keyboard = (function (obj) {
                 var msgLeft = '';
                 var sel = this.getSelection();
                 if (sel.length > 0) {
-                    msgLeft = String(sel.length).replace(/(\d)(?=(\d\d\d)+(?!\d))/g, "$1,") + ' ' + w2utils.lang('selected');
-                    var tmp = sel[0];
-                    if (typeof tmp == 'object') tmp = tmp.recid + ', '+ w2utils.lang('Column') +': '+ tmp.column;
-                    if (sel.length == 1) msgLeft = w2utils.lang('Record ID') + ': '+ tmp + ' ';
+                    if (this.show.statusSelection && sel.length > 1) {
+                        msgLeft = String(sel.length).replace(/(\d)(?=(\d\d\d)+(?!\d))/g, "$1,") + ' ' + w2utils.lang('selected');
+                    }
+                    if (this.show.statusRecordID && sel.length == 1) {
+                        var tmp = sel[0];
+                        if (typeof tmp == 'object') tmp = tmp.recid + ', '+ w2utils.lang('Column') +': '+ tmp.column;
+                        msgLeft = w2utils.lang('Record ID') + ': '+ tmp + ' ';
+                    }
                 }
                 $('#grid_'+ this.name +'_footer .w2ui-footer-left').html(msgLeft);
                 // toolbar
@@ -6530,7 +6588,7 @@ w2utils.keyboard = (function (obj) {
                     scrollLeft  : this.last.scrollLeft
                 },
                 sortData    : [],
-                searchData  : [],
+                searchData  : []
             };
             for (var i in this.columns) {
                 var col = this.columns[i];
@@ -6657,7 +6715,7 @@ w2utils.keyboard = (function (obj) {
                         if (typeof rec[column.field] != 'number') rec[column.field] = parseFloat(rec[column.field]);
                     }
                     // date
-                    if (['date', 'age'].indexOf(column.render) != -1) {
+                    if (['date', 'age'].indexOf(column.render.split(':')[0]) != -1) {
                         if (!rec[column.field + '_']) {
                             var dt = rec[column.field];
                             if (w2utils.isInt(dt)) dt = parseInt(dt);
@@ -6686,7 +6744,7 @@ w2utils.keyboard = (function (obj) {
 
         nextCell: function (col_ind, editable) {
             var check = col_ind + 1;
-            if (this.columns.length == check) return false;
+            if (this.columns.length == check) return null;
             if (editable === true) {
                 var edit = this.columns[check].editable;
                 if (this.columns[check].hidden || typeof edit == 'undefined'
@@ -6697,7 +6755,7 @@ w2utils.keyboard = (function (obj) {
 
         prevCell: function (col_ind, editable) {
             var check = col_ind - 1;
-            if (check < 0) return false;
+            if (check < 0) return null;
             if (editable === true) {
                 var edit = this.columns[check].editable;
                 if (this.columns[check].hidden || typeof edit == 'undefined'
@@ -6754,14 +6812,10 @@ w2utils.keyboard = (function (obj) {
 *   - onResize for the panel
 *   - add more panel title positions (left=rotated, right=rotated, bottom)
 *   - bug: resizer is visible (and onHover) when panel is hidden.
+*   - bug: when you assign content before previous transition completed.
 *
-* == 1.4 changes
-*   - deleted getSelection().removeAllRanges() - see https://github.com/vitmalina/w2ui/issues/323
-*   - added panel title
-*   - added panel.maxSize property
-*   - fixed resize bugs
-*   - BUG resize problems (resizer flashes, not very snappy, % should stay in percent)
-*   - added onResizerClick event
+* == 1.5 changes
+*   - $('#layout').w2layout() - if called w/o argument then it returns layout object
 *
 ************************************************************************/
 
@@ -6794,7 +6848,7 @@ w2utils.keyboard = (function (obj) {
     // -- Registers as a jQuery plugin
 
     $.fn.w2layout = function(method) {
-        if (typeof method === 'object' || !method ) {
+        if ($.isPlainObject(method)) {
             // check name parameter
             if (!w2utils.checkName(method, 'w2layout')) return;
             var panels = method.panels || [];
@@ -6818,12 +6872,15 @@ w2utils.keyboard = (function (obj) {
             w2ui[object.name] = object;
             return object;
 
-        } else if (w2ui[$(this).attr('name')]) {
-            var obj = w2ui[$(this).attr('name')];
-            obj[method].apply(obj, Array.prototype.slice.call(arguments, 1));
-            return this;
         } else {
-            console.log('ERROR: Method ' +  method + ' does not exist on jQuery.w2layout' );
+            var obj = w2ui[$(this).attr('name')];
+            if (!obj) return null;
+            if (arguments.length > 0) {
+                if (obj[method]) obj[method].apply(obj, Array.prototype.slice.call(arguments, 1));
+                return this;
+            } else {
+                return obj;
+            }
         }
 
         function initTabs(object, panel, tabs) {
@@ -6857,8 +6914,8 @@ w2utils.keyboard = (function (obj) {
     w2layout.prototype = {
         // default setting for a panel
         panel: {
-            title     : '',
             type      : null,        // left, right, top, bottom
+            title     : '',
             size      : 100,        // width or height depending on panel name
             minSize   : 20,
             maxSize   : false,
@@ -7832,12 +7889,8 @@ w2utils.keyboard = (function (obj) {
 *
 * == NICE TO HAVE ==
 *   - transition should include title, body and buttons, not just body
-*
-* == 1.4 changes
-*   - deleted getSelection().removeAllRanges() - see https://github.com/vitmalina/w2ui/issues/323
-*   - new: w2popup.status can be ['closed', 'opening', 'open', 'closing', resizing', 'moving']
-*   - add lock method() to lock popup content
-*   - fixed bug with max width/height of message
+*   - .message() should have same props (body, buttons, title?)
+*   - hide overlay on esc
 *
 ************************************************************************/
 
@@ -7926,7 +7979,7 @@ var w2popup = {};
             }
             // get old options and merge them
             var old_options = $('#w2ui-popup').data('options');
-            var options = $.extend({}, this.defaults, { body : '' }, old_options, options, { maximized: false });
+            var options = $.extend({}, this.defaults, old_options, { title: '', body : '', buttons: '' }, options, { maximized: false });
             // need timer because popup might not be open
             setTimeout(function () { $('#w2ui-popup').data('options', options); }, 100);
             // if new - reset event handlers
@@ -7956,8 +8009,8 @@ var w2popup = {};
             }
             if (parseInt(width)  - 10 < parseInt(options.width))  options.width  = parseInt(width)  - 10;
             if (parseInt(height) - 10 < parseInt(options.height)) options.height = parseInt(height) - 10;
-            var top  = ((parseInt(height) - parseInt(options.height)) / 2) * 0.6;
-            var left = (parseInt(width) - parseInt(options.width)) / 2;
+            var top  = parseInt(((parseInt(height) - parseInt(options.height)) / 2) * 0.6);
+            var left = parseInt((parseInt(width) - parseInt(options.width)) / 2);
             // check if message is already displayed
             if ($('#w2ui-popup').length == 0) {
                 // trigger event
@@ -7966,28 +8019,30 @@ var w2popup = {};
                 w2popup.status = 'opening';
                 // output message
                 w2popup.lockScreen(options);
-                var msg = '<div id="w2ui-popup" class="w2ui-popup" style="'+
-                                'width: ' + parseInt(options.width) + 'px; height: ' + parseInt(options.height) + 'px; opacity: 0; '+
-                                '-webkit-transform: scale(0.8); -moz-transform: scale(0.8); -ms-transform: scale(0.8); -o-transform: scale(0.8); '+
-                                'left: ' + left + 'px; top: ' + top + 'px;">';
-                if (options.title != '') {
-                    msg +='<div class="w2ui-msg-title">'+
-                          (options.showClose ? '<div class="w2ui-msg-button w2ui-msg-close" onmousedown="event.stopPropagation()" onclick="w2popup.close(); '+
-                                                 'if (event.stopPropagation) event.stopPropagation(); else event.cancelBubble = true;">Close</div>' : '')+
-                          (options.showMax ? '<div class="w2ui-msg-button w2ui-msg-max" onmousedown="event.stopPropagation()" onclick="w2popup.toggle()">Max</div>' : '') +
-                              options.title +
-                          '</div>';
+                var btn = '';
+                if (options.showClose) {
+                    btn += '<div class="w2ui-msg-button w2ui-msg-close" onmousedown="event.stopPropagation()" onclick="w2popup.close()">Close</div>';
                 }
-                msg += '<div class="w2ui-box1" style="'+(options.title == '' ? 'top: 0px !important;' : '')+(options.buttons == '' ? 'bottom: 0px !important;' : '')+'">';
-                msg += '<div class="w2ui-msg-body' + (!options.title != '' ? ' w2ui-msg-no-title' : '') + (!options.buttons != '' ? ' w2ui-msg-no-buttons' : '') + '" style="' + options.style + '">' + options.body + '</div>';
-                msg += '</div>';
-                msg += '<div class="w2ui-box2" style="'+(options.title == '' ? 'top: 0px !important;' : '')+(options.buttons == '' ? 'bottom: 0px !important;' : '')+'">';
-                msg += '<div class="w2ui-msg-body' + (!options.title != '' ? ' w2ui-msg-no-title' : '') + (!options.buttons != '' ? ' w2ui-msg-no-buttons' : '') + '" style="' + options.style + '"></div>';
-                msg += '</div>';
-                if (options.buttons != '') {
-                    msg += '<div class="w2ui-msg-buttons">' + options.buttons + '</div>';
+                if (options.showMax) {
+                    btn += '<div class="w2ui-msg-button w2ui-msg-max" onmousedown="event.stopPropagation()" onclick="w2popup.toggle()">Max</div>';
                 }
-                msg += '</div>';
+                var msg='<div id="w2ui-popup" class="w2ui-popup" style="opacity: 0; left: '+ left +'px; top: '+ top +'px;'+
+                        '     width: ' + parseInt(options.width) + 'px; height: ' + parseInt(options.height) + 'px; '+
+                        '    -webkit-transform: scale(0.8); -moz-transform: scale(0.8); -ms-transform: scale(0.8); -o-transform: scale(0.8); "'+
+                        '>'+
+                        '   <div class="w2ui-msg-title" style="'+ (options.title == '' ? 'display: none' : '') +'">' + btn + options.title + '</div>'+
+                        '   <div class="w2ui-box1" style="'+ (options.title == '' ? 'top: 0px !important;' : '') + 
+                                    (options.buttons == '' ? 'bottom: 0px !important;' : '') + '">'+
+                        '       <div class="w2ui-msg-body' + (!options.title != '' ? ' w2ui-msg-no-title' : '') + 
+                                    (!options.buttons != '' ? ' w2ui-msg-no-buttons' : '') + '" style="' + options.style + '">' + options.body + '</div>'+
+                        '   </div>'+
+                        '   <div class="w2ui-box2" style="' + (options.title == '' ? 'top: 0px !important;' : '') +
+                                    (options.buttons == '' ? 'bottom: 0px !important;' : '') + '">'+
+                        '       <div class="w2ui-msg-body' + (!options.title != '' ? ' w2ui-msg-no-title' : '') + 
+                                    (!options.buttons != '' ? ' w2ui-msg-no-buttons' : '') + '" style="' + options.style + '"></div>'+
+                        '       </div>'+
+                        '   <div class="w2ui-msg-buttons" style="'+ (options.buttons == '' ? 'display: none' : '') +'">' + options.buttons + '</div>'+
+                        '</div>';
                 $('body').append(msg);
                 // allow element to render
                 setTimeout(function () {
@@ -8034,11 +8089,27 @@ var w2popup = {};
                 // show new items
                 var body = $('#w2ui-popup .w2ui-box2 > .w2ui-msg-body').html(options.body);
                 if (body.length > 0) body[0].style.cssText = options.style;
-                $('#w2ui-popup .w2ui-msg-buttons').html(options.buttons);
-                $('#w2ui-popup .w2ui-msg-title').html(
-                      (options.showClose ? '<div class="w2ui-msg-button w2ui-msg-close" onmousedown="event.stopPropagation()" onclick="w2popup.close()">Close</div>' : '')+
-                      (options.showMax ? '<div class="w2ui-msg-button w2ui-msg-max" onmousedown="event.stopPropagation()" onclick="w2popup.toggle()">Max</div>' : '') +
-                      options.title);
+                if (options.buttons != '') {
+                    $('#w2ui-popup .w2ui-msg-buttons').show().html(options.buttons);
+                    $('#w2ui-popup .w2ui-msg-body').removeClass('w2ui-msg-no-buttons');
+                    $('#w2ui-popup .w2ui-box1, #w2ui-popup .w2ui-box2').css('bottom', '');
+                } else {
+                    $('#w2ui-popup .w2ui-msg-buttons').hide().html('');
+                    $('#w2ui-popup .w2ui-msg-body').addClass('w2ui-msg-no-buttons');
+                    $('#w2ui-popup .w2ui-box1, #w2ui-popup .w2ui-box2').css('bottom', '0px');
+                }
+                if (options.title != '') {
+                    $('#w2ui-popup .w2ui-msg-title').show().html(
+                          (options.showClose ? '<div class="w2ui-msg-button w2ui-msg-close" onmousedown="event.stopPropagation()" onclick="w2popup.close()">Close</div>' : '') +
+                          (options.showMax ? '<div class="w2ui-msg-button w2ui-msg-max" onmousedown="event.stopPropagation()" onclick="w2popup.toggle()">Max</div>' : '') +
+                          options.title);
+                    $('#w2ui-popup .w2ui-msg-body').removeClass('w2ui-msg-no-title');
+                    $('#w2ui-popup .w2ui-box1, #w2ui-popup .w2ui-box2').css('top', '');
+                } else {
+                    $('#w2ui-popup .w2ui-msg-title').hide().html('');
+                    $('#w2ui-popup .w2ui-msg-body').addClass('w2ui-msg-no-title');
+                    $('#w2ui-popup .w2ui-box1, #w2ui-popup .w2ui-box2').css('top', '0px');
+                }
                 // transition
                 var div_old = $('#w2ui-popup .w2ui-box1')[0];
                 var div_new = $('#w2ui-popup .w2ui-box2')[0];
@@ -8130,7 +8201,7 @@ var w2popup = {};
 
         keydown: function (event) {
             var options = $('#w2ui-popup').data('options');
-            if (!options.keyboard) return;
+            if (options && !options.keyboard) return;
             // trigger event
             var eventData = w2popup.trigger({ phase: 'before', type: 'keydown', target: 'popup', options: options, originalEvent: event });
             if (eventData.isCancelled === true) return;
@@ -8437,11 +8508,13 @@ var w2popup = {};
 
         resize: function (width, height, callBack) {
             var options = $('#w2ui-popup').data('options');
+            width  = parseInt(width);
+            height = parseInt(height);
             // calculate new position
-            if (parseInt($(window).width())  - 10 < parseInt(width))  width  = parseInt($(window).width())  - 10;
-            if (parseInt($(window).height()) - 10 < parseInt(height)) height = parseInt($(window).height()) - 10;
-            var top  = ((parseInt($(window).height()) - parseInt(height)) / 2) * 0.8;
-            var left = (parseInt($(window).width()) - parseInt(width)) / 2;
+            if ($(window).width()  - 10 < width)  width  = $(window).width()  - 10;
+            if ($(window).height() - 10 < height) height = $(window).height() - 10;
+            var top  = ($(window).height() - height) / 2 * 0.8;
+            var left = ($(window).width() - width) / 2;
             // resize there
             $('#w2ui-popup').css({
                 '-webkit-transition': options.speed + 's width, ' + options.speed + 's height, ' + options.speed + 's left, ' + options.speed + 's top',
@@ -8459,7 +8532,7 @@ var w2popup = {};
                 if (typeof callBack == 'function') callBack();
             }, (options.speed * 1000) + 50); // give extra 50 ms
         }
-    }
+    };
 
     // merge in event handling
     $.extend(w2popup, w2utils.event);
@@ -8470,140 +8543,156 @@ var w2popup = {};
 // --- Common dialogs
 
 var w2alert = function (msg, title, callBack) {
-    if (typeof title == 'undefined') title = w2utils.lang('Notification');
+    if (title == null) title = w2utils.lang('Notification');
     if ($('#w2ui-popup').length > 0 && w2popup.status != 'closing') {
         w2popup.message({
             width   : 400,
-            height  : 150,
+            height  : 170,
             html    : '<div style="position: absolute; top: 0px; left: 0px; right: 0px; bottom: 45px; overflow: auto">' +
                       '        <div class="w2ui-centered" style="font-size: 13px;">' + msg + '</div>' +
                       '</div>' +
                       '<div style="position: absolute; bottom: 7px; left: 0px; right: 0px; text-align: center; padding: 5px">' +
                       '        <button onclick="w2popup.message();" class="w2ui-popup-btn btn">' + w2utils.lang('Ok') + '</button>' +
                       '</div>',
-            onClose : function () {
+            onOpen: function () {
+                $('#w2ui-popup .w2ui-popup-message .w2ui-popup-btn').focus();
+            },
+            onClose: function () {
                 if (typeof callBack == 'function') callBack();
             }
         });
     } else {
         w2popup.open({
             width     : 450,
-            height     : 200,
-            showMax : false,
+            height    : 220,
+            showMax   : false,
+            showClose : false,
             title     : title,
-            body    : '<div class="w2ui-centered" style="font-size: 13px;">' + msg + '</div>',
-            buttons : '<button onclick="w2popup.close();" class="w2ui-popup-btn btn">' + w2utils.lang('Ok') + '</button>',
-            onClose : function () {
+            body      : '<div class="w2ui-centered" style="font-size: 13px;">' + msg + '</div>',
+            buttons   : '<button onclick="w2popup.close();" class="w2ui-popup-btn btn">' + w2utils.lang('Ok') + '</button>',
+            onOpen: function (event) {
+                // do not use onComplete as it is slower
+                setTimeout(function () { $('#w2ui-popup .w2ui-popup-btn').focus(); }, 1);
+            },
+            onKeydown: function (event) {
+            $('#w2ui-popup .w2ui-popup-btn').focus().addClass('clicked'); 
+            },
+            onClose: function () {
                 if (typeof callBack == 'function') callBack();
             }
         });
     }
 };
 
-var w2confirm = function (obj, callBack) {
-
-    var w2confirm_width     = 400,
-        w2confirm_height    = 150,
-        w2confirm_yes_text  = 'Yes',
-        w2confirm_yes_class = '',
-        w2confirm_yes_style = '',
-        w2confirm_no_text   = 'No',
-        w2confirm_no_class  = '',
-        w2confirm_no_style  = '',
-        title               =  w2utils.lang('Confirmation');
-
-    if (arguments.length == 1 && typeof obj == 'object') {
-        var msg       = w2utils.lang(obj['msg']),
-            callBack  = obj['callBack'],
-            btn_yes   = obj['btn_yes'],
-            btn_no    = obj['btn_no'];
-
-        if (obj.title) title = w2utils.lang(obj['title']);
-        if (w2utils.isInt(obj.width))  w2confirm_width  = obj.width;
-        if (w2utils.isInt(obj.height)) w2confirm_height = obj.height;
-
-
-        if (btn_yes) {
-            if (btn_yes.text)  w2confirm_yes_text = w2utils.lang(btn_yes.text);
-            if (btn_yes.class) w2confirm_yes_class = btn_yes["class"];
-            if (btn_yes.style) w2confirm_yes_style = btn_yes.style;
-        }
-        if (btn_no) {
-            if (btn_no.text)  w2confirm_no_text = w2utils.lang(btn_no.text);
-            if (btn_no.class) w2confirm_no_class = btn_no["class"];
-            if (btn_no.style) w2confirm_no_style = btn_no.style;
-        }
-
+var w2confirm = function (msg, title, callBack) {
+    var options  = {};
+    var defaults = {
+        msg         : '',
+        title       : w2utils.lang('Confirmation'),
+        width       : ($('#w2ui-popup').length > 0 ? 400 : 450),
+        height      : ($('#w2ui-popup').length > 0 ? 170 : 220),
+        yes_text    : 'Yes',
+        yes_class   : '',
+        yes_style   : '',
+        yes_callBack: null,
+        no_text     : 'No',
+        no_class    : '',
+        no_style    : '',
+        no_callBack : null,
+        callBack    : null
+    };
+    if (arguments.length == 1 && typeof msg == 'object') {
+        $.extend(options, defaults, msg);
     } else {
-        var msg = obj;
+        if (typeof title == 'function') {
+            $.extend(options, defaults, {
+                msg     : msg,
+                callBack: title
+            })            
+        } else {
+            $.extend(options, defaults, {
+                msg     : msg,
+                title   : title, 
+                callBack: callBack
+            })            
+        }
     }
-
-       if ($('#w2ui-popup').length > 0 && w2popup.status != 'closing') {
-
-        if (w2confirm_width > w2popup.get().width) w2confirm_width = w2popup.get().width;
-        if (w2confirm_height > (w2popup.get().height - 50)) w2confirm_height = w2popup.get().height - 50;
+    if ($('#w2ui-popup').length > 0 && w2popup.status != 'closing') {
+        if (options.width > w2popup.get().width) options.width = w2popup.get().width;
+        if (options.height > (w2popup.get().height - 50)) options.height = w2popup.get().height - 50;
           w2popup.message({
-            width   : w2confirm_width,
-            height  : w2confirm_height,
+            width   : options.width,
+            height  : options.height,
             html    : '<div style="position: absolute; top: 0px; left: 0px; right: 0px; bottom: 40px; overflow: auto">' +
-                      '        <div class="w2ui-centered" style="font-size: 13px;">' + msg + '</div>' +
+                      '        <div class="w2ui-centered" style="font-size: 13px;">' + options.msg + '</div>' +
                       '</div>' +
                       '<div style="position: absolute; bottom: 7px; left: 0px; right: 0px; text-align: center; padding: 5px">' +
-                      '        <button id="Yes" class="w2ui-popup-btn btn '+w2confirm_yes_class+'" style="'+w2confirm_yes_style+'">' + w2utils.lang(w2confirm_yes_text) + '</button>' +
-                      '        <button id="No" class="w2ui-popup-btn btn '+w2confirm_no_class+'" style="'+w2confirm_no_style+'">' + w2utils.lang(w2confirm_no_text) + '</button>' +
+                      '        <button id="Yes" class="w2ui-popup-btn btn '+ options.yes_class +'" style="'+ options.yes_style +'">' + w2utils.lang(options.yes_text) + '</button>' +
+                      '        <button id="No" class="w2ui-popup-btn btn '+ options.no_class +'" style="'+ options.no_style +'">' + w2utils.lang(options.no_text) + '</button>' +
                       '</div>',
             onOpen: function () {
                 $('#w2ui-popup .w2ui-popup-message .btn').on('click', function (event) {
                     w2popup.message();
-                    if (typeof callBack == 'function') callBack(event.target.id);
+                    if (typeof options.callBack == 'function') options.callBack(event.target.id);
+                    if (event.target.id == 'Yes' && typeof options.yes_callBack == 'function') options.yes_callBack();
+                    if (event.target.id == 'No'  && typeof options.no_callBack == 'function') options.no_callBack();
                 });
-            },
-            onKeydown: function (event) {
-                switch (event.originalEvent.keyCode) {
-                    case 13: // enter
-                        if (typeof callBack == 'function') callBack('Yes');
-                        w2popup.message();
-                        break
-                    case 27: // esc
-                        if (typeof callBack == 'function') callBack('No');
-                        w2popup.message();
-                        break
-                }
             }
+            // onKeydown will not work here
         });
+
     } else {
-        if (!w2utils.isInt(obj.height)) w2confirm_height = w2confirm_height + 50;
+
+        if (!w2utils.isInt(options.height)) options.height = options.height + 50;
         w2popup.open({
-            width      : w2confirm_width,
-            height     : w2confirm_height,
-            title      : title,
+            width      : options.width,
+            height     : options.height,
+            title      : options.title,
             modal      : true,
             showClose  : false,
-            body       : '<div class="w2ui-centered" style="font-size: 13px;">' + msg + '</div>',
-            buttons    : '<button id="Yes" class="w2ui-popup-btn btn '+w2confirm_yes_class+'" style="'+w2confirm_yes_style+'">' + w2utils.lang(w2confirm_yes_text) + '</button>'+
-                         '<button id="No" class="w2ui-popup-btn btn '+w2confirm_no_class+'" style="'+w2confirm_no_style+'">' + w2utils.lang(w2confirm_no_text) + '</button>',
+            body       : '<div class="w2ui-centered" style="font-size: 13px;">' + options.msg + '</div>',
+            buttons    : '<button id="Yes" class="w2ui-popup-btn btn '+ options.yes_class +'" style="'+ options.yes_style +'">'+ w2utils.lang(options.yes_text) +'</button>'+
+                         '<button id="No" class="w2ui-popup-btn btn '+ options.no_class +'" style="'+ options.no_style +'">'+ w2utils.lang(options.no_text) +'</button>',
             onOpen: function (event) {
-                event.onComplete = function () {
+                // do not use onComplete as it is slower
+                setTimeout(function () {
                     $('#w2ui-popup .w2ui-popup-btn').on('click', function (event) {
                         w2popup.close();
-                        if (typeof callBack == 'function') callBack(event.target.id);
+                        if (typeof options.callBack == 'function') options.callBack(event.target.id);
+                        if (event.target.id == 'Yes' && typeof options.yes_callBack == 'function') options.yes_callBack();
+                        if (event.target.id == 'No'  && typeof options.no_callBack == 'function') options.no_callBack();
                     });
-                }
+                    $('#w2ui-popup .w2ui-popup-btn#No').focus();
+                }, 1);
             },
             onKeydown: function (event) {
-                switch (event.originalEvent.keyCode) {
-                    case 13: // enter
-                        if (typeof callBack == 'function') callBack('Yes');
-                        w2popup.close();
-                        break
-                    case 27: // esc
-                        if (typeof callBack == 'function') callBack('No');
-                        w2popup.close();
-                        break
+                // if there are no messages
+                if ($('#w2ui-popup .w2ui-popup-message').length == 0) {
+                    switch (event.originalEvent.keyCode) {
+                        case 13: // enter
+                            $('#w2ui-popup .w2ui-popup-btn#Yes').focus().addClass('clicked'); // no need fo click as enter will do click
+                            w2popup.close();
+                            break;
+                        case 27: // esc
+                            $('#w2ui-popup .w2ui-popup-btn#No').focus().click();
+                            w2popup.close();
+                            break;
+                    }
                 }
             }
         });
     }
+
+    return {
+        yes: function (fun) {
+            options.yes_callBack = fun;
+            return this;
+        },
+        no: function (fun) {
+            options.no_callBack = fun;
+            return this;
+        }
+    };
 };
 /************************************************************************
 *   Library: Web 2.0 UI for jQuery (using prototypical inheritance)
@@ -8614,11 +8703,12 @@ var w2confirm = function (obj, callBack) {
 *
 * == NICE TO HAVE ==
 *   - on overflow display << >>
+*   - declarative tabs
 *
-* == 1.4 changes
-*   - deleted getSelection().removeAllRanges() - see https://github.com/vitmalina/w2ui/issues/323
-*   - individual tab onClick (possibly other events) are not working
-*   - added route support
+* == 1.5 changes
+*   - $('#tabs').w2tabs() - if called w/o argument then it returns tabs object
+*   - added flow property (up/down)
+*   - added tab.style
 *
 ************************************************************************/
 
@@ -8627,6 +8717,7 @@ var w2confirm = function (obj, callBack) {
         this.box       = null;      // DOM Element that holds the element
         this.name      = null;      // unique name for w2ui
         this.active    = null;
+        this.flow      = 'down';
         this.tabs      = [];
         this.routeData = {};        // data for dynamic routes
         this.right     = '';
@@ -8646,7 +8737,7 @@ var w2confirm = function (obj, callBack) {
     // -- Registers as a jQuery plugin
 
     $.fn.w2tabs = function(method) {
-        if (typeof method === 'object' || !method ) {
+        if ($.isPlainObject(method)) {
             // check name parameter
             if (!w2utils.checkName(method, 'w2tabs')) return;
             // extend tabs
@@ -8661,13 +8752,15 @@ var w2confirm = function (obj, callBack) {
             // register new object
             w2ui[object.name] = object;
             return object;
-        } else if (w2ui[$(this).attr('name')]) {
-            var obj = w2ui[$(this).attr('name')];
-            obj[method].apply(obj, Array.prototype.slice.call(arguments, 1));
-            return this;
         } else {
-            console.log('ERROR: Method ' +  method + ' does not exist on jQuery.w2tabs' );
-            return undefined;
+            var obj = w2ui[$(this).attr('name')];
+            if (!obj) return null;
+            if (arguments.length > 0) {
+                if (obj[method]) obj[method].apply(obj, Array.prototype.slice.call(arguments, 1));
+                return this;
+            } else {
+                return obj;
+            }
         }
     };
 
@@ -8683,6 +8776,7 @@ var w2confirm = function (obj, callBack) {
             disabled  : false,
             closable  : false,
             hint      : '',
+            style     : '',
             onClick   : null,
             onRefresh : null,
             onClose   : null
@@ -8824,7 +8918,7 @@ var w2confirm = function (obj, callBack) {
 
         refresh: function (id) {
             var time = (new Date()).getTime();
-            // if (window.getSelection) window.getSelection().removeAllRanges(); // clear selection
+            if (this.flow == 'up') $(this.box).addClass('w2ui-tabs-up'); else $(this.box).removeClass('w2ui-tabs-up');
             // event before
             var eventData = this.trigger({ phase: 'before', type: 'refresh', target: (typeof id !== 'undefined' ? id : this.name), object: this.get(id) });
             if (eventData.isCancelled === true) return;
@@ -8840,7 +8934,7 @@ var w2confirm = function (obj, callBack) {
                 var jq_el   = $(this.box).find('#tabs_'+ this.name +'_tab_'+ w2utils.escapeId(tab.id));
                 var tabHTML = (tab.closable ? '<div class="w2ui-tab-close" onclick="w2ui[\''+ this.name +'\'].animateClose(\''+ tab.id +'\', event);"></div>' : '') +
                     '    <div class="w2ui-tab'+ (this.active === tab.id ? ' active' : '') + (tab.closable ? ' closable' : '') +'" '+
-                    '        title="'+ (typeof tab.hint !== 'undefined' ? tab.hint : '') +'"'+
+                    '        title="'+ (typeof tab.hint !== 'undefined' ? tab.hint : '') +'" style="'+ tab.style +'" '+ 
                     '        onclick="w2ui[\''+ this.name +'\'].click(\''+ tab.id +'\', event);">' + tab.text + '</div>';
                 if (jq_el.length === 0) {
                     // does not exist - create it
@@ -8948,7 +9042,7 @@ var w2confirm = function (obj, callBack) {
                 var info  = w2utils.parseRoute(route);
                 if (info.keys.length > 0) {
                     for (var k = 0; k < info.keys.length; k++) {
-                        if (!this.routeData[info.keys[k].name]) continue;
+                        if (this.routeData[info.keys[k].name] == null) continue;
                         route = route.replace((new RegExp(':'+ info.keys[k].name, 'g')), this.routeData[info.keys[k].name]);
                     }
                 }
@@ -9046,12 +9140,11 @@ var w2confirm = function (obj, callBack) {
 *
 * == NICE TO HAVE ==
 *   - on overflow display << >>
-*   - verticle toolbar
+*   - vertical toolbar
+*   - declarative toolbar
 *
-* == 1.4 changes
-*   - deleted getSelection().removeAllRanges() - see https://github.com/vitmalina/w2ui/issues/323
-*   - fixed submenu event bugs
-*   - added route support
+* == 1.5 changes
+*   - $('#toolbar').w2toolbar() - if called w/o argument then it returns toolbar object
 *
 ************************************************************************/
 
@@ -9075,7 +9168,7 @@ var w2confirm = function (obj, callBack) {
     // -- Registers as a jQuery plugin
 
     $.fn.w2toolbar = function(method) {
-        if (typeof method === 'object' || !method ) {
+        if ($.isPlainObject(method)) {
             // check name parameter
             if (!w2utils.checkName(method, 'w2toolbar')) return;
             // extend items
@@ -9092,12 +9185,15 @@ var w2confirm = function (obj, callBack) {
             w2ui[object.name] = object;
             return object;
 
-        } else if (w2ui[$(this).attr('name')]) {
-            var obj = w2ui[$(this).attr('name')];
-            obj[method].apply(obj, Array.prototype.slice.call(arguments, 1));
-            return this;
         } else {
-            console.log('ERROR: Method ' +  method + ' does not exist on jQuery.w2toolbar' );
+            var obj = w2ui[$(this).attr('name')];
+            if (!obj) return null;
+            if (arguments.length > 0) {
+                if (obj[method]) obj[method].apply(obj, Array.prototype.slice.call(arguments, 1));
+                return this;
+            } else {
+                return obj;
+            }
         }
     };
 
@@ -9113,6 +9209,7 @@ var w2confirm = function (obj, callBack) {
             html     : '',
             img      : null,
             icon     : null,
+            count    : null,
             hidden   : false,
             disabled : false,
             checked  : false,       // used for radio buttons
@@ -9120,6 +9217,7 @@ var w2confirm = function (obj, callBack) {
             hint     : '',
             group    : null,        // used for radio buttons
             items    : null,        // for type menu it is an array of items in the menu
+            overlay  : {},
             onClick  : null
         },
 
@@ -9434,6 +9532,7 @@ var w2confirm = function (obj, callBack) {
                             '  <tr>' +
                                     img +
                                     (item.text !== '' ? '<td class="w2ui-tb-caption" nowrap>'+ item.text +'</td>' : '') +
+                                    (item.count != null ? '<td class="w2ui-tb-count" nowrap><span>'+ item.count +'</span></td>' : '') +
                                     (((item.type === 'drop' || item.type === 'menu') && item.arrow !== false) ?
                                         '<td class="w2ui-tb-down" nowrap><div></div></td>' : '') +
                             '  </tr></table>'+
@@ -9475,7 +9574,7 @@ var w2confirm = function (obj, callBack) {
                     var info  = w2utils.parseRoute(route);
                     if (info.keys.length > 0) {
                         for (var k = 0; k < info.keys.length; k++) {
-                            if (!this.routeData[info.keys[k].name]) continue;
+                            if (obj.routeData[info.keys[k].name] == null) continue;
                             route = route.replace((new RegExp(':'+ info.keys[k].name, 'g')), this.routeData[info.keys[k].name]);
                         }
                     }
@@ -9590,12 +9689,8 @@ var w2confirm = function (obj, callBack) {
 *   - add route property that would navigate to a #route
 *   - node.style is missleading - should be there to apply color for example
 *
-* == 1.4 changes
-*   - deleted getSelection().removeAllRanges() - see https://github.com/vitmalina/w2ui/issues/323
-*   - bug: bixed bug with selection
-*   - new: find({ params }) - returns all matched nodes
-*   - change: get() w/o params returns all node ids
-*   - added route support
+* == 1.5 changes
+*   - $('#sidebar').w2sidebar() - if called w/o argument then it returns sidebar object
 *
 ************************************************************************/
 
@@ -9634,7 +9729,7 @@ var w2confirm = function (obj, callBack) {
     // -- Registers as a jQuery plugin
 
     $.fn.w2sidebar = function(method) {
-        if (typeof method === 'object' || !method ) {
+        if ($.isPlainObject(method)) {
             // check name parameter
             if (!w2utils.checkName(method, 'w2sidebar')) return;
             // extend items
@@ -9652,12 +9747,15 @@ var w2confirm = function (obj, callBack) {
             w2ui[object.name] = object;
             return object;
 
-        } else if (w2ui[$(this).attr('name')]) {
-            var obj = w2ui[$(this).attr('name')];
-            obj[method].apply(obj, Array.prototype.slice.call(arguments, 1));
-            return this;
         } else {
-            console.log('ERROR: Method ' +  method + ' does not exist on jQuery.w2sidebar' );
+            var obj = w2ui[$(this).attr('name')];
+            if (!obj) return null;
+            if (arguments.length > 0) {
+                if (obj[method]) obj[method].apply(obj, Array.prototype.slice.call(arguments, 1));
+                return this;
+            } else {
+                return obj;
+            }
         }
     };
 
@@ -10042,7 +10140,7 @@ var w2confirm = function (obj, callBack) {
                     var info  = w2utils.parseRoute(route);
                     if (info.keys.length > 0) {
                         for (var k = 0; k < info.keys.length; k++) {
-                            if (!obj.routeData[info.keys[k].name]) continue;
+                            if (obj.routeData[info.keys[k].name] == null) continue;
                             route = route.replace((new RegExp(':'+ info.keys[k].name, 'g')), obj.routeData[info.keys[k].name]);
                         }
                     }
@@ -10430,29 +10528,12 @@ var w2confirm = function (obj, callBack) {
 *   - arrows no longer work (for int)
 *   - form to support custom types
 *   - bug: if input is hidden and then enum is applied, then when it becomes visible, it will be 110px
+*   - add compare function for list, combo, enum
+*   - deprecate placeholder, read it from input
 *
-* == 1.4 Changes ==
-*   - select - for select, list - for drop down (needs this in grid)
-*   - $().addType() - changes sligtly (this.el)
-*   - $().removeType() - new method
-*   - enum add events: onLoad, onRequest, onDelete,  for already selected elements
-*   - enum - refresh happens on each key press even if not needed (for speed)
-*   - rewrire everythin in objects (w2ftext, w2fenum, w2fdate)
-*   - render calendar to the div
-*   - added .btn with colors
-*   - added enum.style and file.style attributes
-*   - test all fields as Read Only
-*   - added openOnFocus
-*   - deprecated -- change: showAll -> applyFilter
-*   - color: select with keyboard
-*   - enum: addNew event
-*   - added icon and onIconClick
-*   - new: clearCache
-*   - easy way to add icons
-*   - easy way to navigate month/year in dates
-*   - added step for numeric inputs
-*   - changed prepopulate -> minLength
-*   - added options.postData
+* == 1.5 changes
+*   - added support decimalSymbol (added options.decimalSymbol)
+*   - $('#id').w2field() - will return w2field object (same as $('#id').data('w2field'))
 *
 ************************************************************************/
 
@@ -10460,7 +10541,7 @@ var w2confirm = function (obj, callBack) {
 
     var w2field = function (options) {
         // public properties
-        this.el          = null
+        this.el          = null;
         this.helpers     = {}; // object or helper elements
         this.type        = options.type || 'text';
         this.options     = $.extend(true, {}, options);
@@ -10501,6 +10582,11 @@ var w2confirm = function (obj, callBack) {
                 return pr[method].apply(pr, Array.prototype.slice.call(arguments, 1));
             }
         } else {
+            // if without arguments - return the object
+            if (arguments.length == 0) {
+                var obj = $(this).data('w2field');
+                return obj;
+            }
             if (typeof method == 'string' && typeof options == 'object') {
                 method = $.extend(true, {}, options, { type: method });
             }
@@ -10531,7 +10617,7 @@ var w2confirm = function (obj, callBack) {
                 return null;
             });
         }
-    }
+    };
 
     // ====================================================
     // -- Implementation of core functionality
@@ -10618,6 +10704,7 @@ var w2confirm = function (obj, callBack) {
                         currencyPrefix     : w2utils.settings.currencyPrefix,
                         currencySuffix     : w2utils.settings.currencySuffix,
                         currencyPrecision  : w2utils.settings.currencyPrecision,
+                        decimalSymbol      : w2utils.settings.decimalSymbol,
                         groupSymbol        : w2utils.settings.groupSymbol,
                         arrows             : false,
                         keyboard           : true,
@@ -10629,7 +10716,7 @@ var w2confirm = function (obj, callBack) {
                     this.options = $.extend(true, {}, defaults, options);
                     options = this.options; // since object is re-created, need to re-assign
                     options.numberRE  = new RegExp('['+ options.groupSymbol + ']', 'g');
-                    options.moneyRE   = new RegExp('['+ options.currencyPrefix + options.currencySuffix + options.groupSymbol + ']', 'g');
+                    options.moneyRE   = new RegExp('['+ options.currencyPrefix + options.currencySuffix + options.groupSymbol +']', 'g');
                     options.percentRE = new RegExp('['+ options.groupSymbol + '%]', 'g');
                     // no keyboard support needed
                     if (['text', 'alphanumeric', 'hex'].indexOf(this.type) != -1) {
@@ -10638,6 +10725,7 @@ var w2confirm = function (obj, callBack) {
                     }
                     this.addPrefix(); // only will add if needed
                     this.addSuffix();
+                    if ($(this.el).attr('placeholder') && options.placeholder == '') options.placeholder = $(this.el).attr('placeholder');
                     $(this.el).attr('placeholder', options.placeholder);
                     break;
 
@@ -10650,11 +10738,12 @@ var w2confirm = function (obj, callBack) {
                         keyboard    : false
                     };
                     $.extend(options, defaults);
-                    this.addPrefix();     // only will add if needed
+                    this.addPrefix();    // only will add if needed
                     this.addSuffix();    // only will add if needed
                     // additional checks
                     $(this.el).attr('maxlength', 6);
                     if ($(this.el).val() != '') setTimeout(function () { $(obj.el).change(); }, 1);
+                    if ($(this.el).attr('placeholder') && options.placeholder == '') options.placeholder = $(this.el).attr('placeholder');
                     $(this.el).attr('placeholder', options.placeholder);
                     break;
 
@@ -10664,13 +10753,14 @@ var w2confirm = function (obj, callBack) {
                         placeholder : '',
                         keyboard    : true,
                         silent      : true,
-                        start       : '',        // string or jquery object
-                        end         : '',        // string or jquery object
-                        blocked     : {},        // { '4/11/2011': 'yes' }
+                        start       : '',       // string or jquery object
+                        end         : '',       // string or jquery object
+                        blocked     : {},       // { '4/11/2011': 'yes' }
                         colored     : {}        // { '4/11/2011': 'red:white' }
                     };
                     this.options = $.extend(true, {}, defaults, options);
                     options = this.options; // since object is re-created, need to re-assign
+                    if ($(this.el).attr('placeholder') && options.placeholder == '') options.placeholder = $(this.el).attr('placeholder');
                     $(this.el).attr('placeholder', options.placeholder ? options.placeholder : options.format);
                     break;
 
@@ -10685,7 +10775,8 @@ var w2confirm = function (obj, callBack) {
                     };
                     this.options = $.extend(true, {}, defaults, options);
                     options = this.options; // since object is re-created, need to re-assign
-                    $(this.el).attr('placeholder', options.placeholder ? options.placeholder : (options.format == 'h12' ? 'hh:mi pm' : 'hh:mi'));
+                    if ($(this.el).attr('placeholder') && options.placeholder == '') options.placeholder = $(this.el).attr('placeholder');
+                    $(this.el).attr('placeholder', options.placeholder ? options.placeholder : options.format);
                     break;
 
                 case 'datetime':
@@ -10717,6 +10808,7 @@ var w2confirm = function (obj, callBack) {
                         openOnFocus     : false,        // if to show overlay onclick or when typing
                         markSearch      : false
                     };
+                    options.items = this.normMenu(options.items); // need to be first
                     if (this.type == 'list') {
                         // defaults.search = (options.items && options.items.length >= 10 ? true : false);
                         defaults.openOnFocus = true;
@@ -10737,20 +10829,15 @@ var w2confirm = function (obj, callBack) {
                         align   : 'both',      // same width as control
                         altRows : true         // alternate row color
                     });
-                    options.items      = this.normMenu(options.items);
                     this.options = options;
                     if (!$.isPlainObject(options.selected)) options.selected = {};
                     $(this.el).data('selected', options.selected);
                     if (options.url) this.request(0);
-                    if (options.icon) {
-                        options.prefix = '<span class="w2ui-icon '+ options.icon +'" '+
-                            '    style="cursor: pointer; margin: -2px 5px 0px 0px; font-size: 14px; color: #7F98AD;' + options.iconStyle +'">'+
-                            '</span>';
-                    }
                     if (this.type == 'list') this.addFocus();
                     this.addPrefix();
                     this.addSuffix();
-                    setTimeout(function () { obj.refresh();    }, 10); // need this for icon refresh
+                    setTimeout(function () { obj.refresh(); }, 10); // need this for icon refresh
+                    if ($(this.el).attr('placeholder') && options.placeholder == '') options.placeholder = $(this.el).attr('placeholder');
                     $(this.el).attr('placeholder', options.placeholder).attr('autocomplete', 'off');
                     if (typeof options.selected.text != 'undefined') $(this.el).val(options.selected.text);
                     break;
@@ -10821,12 +10908,13 @@ var w2confirm = function (obj, callBack) {
                         onMouseOut    : null      // when an item is mouse out
                     };
                     options = $.extend({}, defaults, options, {
-                        align         : 'both',    // same width as control
-                        altRows        : true        // alternate row color
+                        align         : 'both',   // same width as control
+                        altRows        : true     // alternate row color
                     });
                     this.options = options;
                     if (!$.isArray(options.selected)) options.selected = [];
                     $(this.el).data('selected', options.selected);
+                    if ($(this.el).attr('placeholder')) options.placeholder = $(this.el).attr('placeholder');
                     this.addMulti();
                     break;
             }
@@ -10839,7 +10927,7 @@ var w2confirm = function (obj, callBack) {
                 onKeydown   : function (event) { obj.keyDown.call(obj, event) },
                 onKeyup     : function (event) { obj.keyUp.call(obj, event) },
                 onKeypress  : function (event) { obj.keyPress.call(obj, event) }
-            }
+            };
             $(this.el)
                 .addClass('w2field')
                 .data('w2field', this)
@@ -10917,22 +11005,49 @@ var w2confirm = function (obj, callBack) {
                 if (obj.helpers.prefix) obj.helpers.prefix.hide();
                 setTimeout(function () {
                     if (!obj.helpers.focus) return;
+                    // if empty show no icon
+                    if (!$.isEmptyObject(selected) && options.icon) {
+                        options.prefix = '<span class="w2ui-icon '+ options.icon +'"style="cursor: pointer; font-size: 14px;' + 
+                                         ' display: inline-block; margin-top: -1px; color: #7F98AD;'+ options.iconStyle +'">'+
+                            '</span>';
+                        obj.addPrefix();                        
+                    } else {
+                        options.prefix = '';
+                        obj.addPrefix();
+                    }
+                    // focus helpder
                     var focus = obj.helpers.focus.find('input');
                     if ($(focus).val() == '') {
                         $(focus).css('opacity', 0).prev().css('opacity', 0);
                         $(obj.el).val(selected && selected.text != null ? selected.text : '');
-                        $(obj.el).attr('placeholder', $(obj.el).attr('_placeholder'));
-                        // if empty show no icon
-                        if ($.isEmptyObject(selected)) {
-                            if (obj.helpers && obj.helpers.prefix) obj.helpers.prefix.hide();
-                        } else {
-                            if (obj.helpers && obj.helpers.prefix) obj.helpers.prefix.show();
-                        }
+                        $(obj.el).attr('placeholder', options.placeholder || '');
                     } else {
                         $(focus).css('opacity', 1).prev().css('opacity', 1);
-                        if (obj.helpers && obj.helpers.prefix) obj.helpers.prefix.hide();
                         $(obj.el).val('');
-                        $(obj.el).attr('_placeholder', $(obj.el).attr('placeholder')).removeAttr('placeholder');
+                        $(obj.el).removeAttr('placeholder');
+                        setTimeout(function () {
+                            if (obj.helpers.prefix) obj.helpers.prefix.hide(); 
+                            var tmp = 'position: absolute; opacity: 0; margin: 4px 0px 0px 2px; background-position: left !important;';
+                            if (options.icon) {
+                                $(focus).css('margin-left', '17px');
+                                $(obj.helpers.focus).find('.icon-search').attr('style', tmp + 'width: 11px !important; opacity: 1');
+                            } else {
+                                $(focus).css('margin-left', '0px');
+                                $(obj.helpers.focus).find('.icon-search').attr('style', tmp + 'width: 0px !important; opacity: 0');
+                            }
+                        }, 1);
+                    }
+                    // if readonly or disabled
+                    if ($(obj.el).prop('readonly') || $(obj.el).prop('disabled')) {
+                        setTimeout(function () { 
+                            $(obj.helpers.prefix).css('opacity', '0.6'); 
+                            $(obj.helpers.suffix).css('opacity', '0.6');
+                        }, 1);
+                    } else {
+                        setTimeout(function () { 
+                            $(obj.helpers.prefix).css('opacity', '1'); 
+                            $(obj.helpers.suffix).css('opacity', '1');
+                        }, 1);
                     }
                 }, 1);
             }
@@ -10945,7 +11060,7 @@ var w2confirm = function (obj, callBack) {
                         ren = options.renderItem(it, s, '<div class="w2ui-list-remove" title="'+ w2utils.lang('Remove') +'" index="'+ s +'">&nbsp;&nbsp;</div>');
                     } else {
                         ren = '<div class="w2ui-list-remove" title="'+ w2utils.lang('Remove') +'" index="'+ s +'">&nbsp;&nbsp;</div>'+
-                              (obj.type == 'enum' ? it.text : it.name + '<span class="file-size"> - '+ w2utils.size(it.size) +'</span>');
+                              (obj.type == 'enum' ? it.text : it.name + '<span class="file-size"> - '+ w2utils.formatSize(it.size) +'</span>');
                     }
                     html += '<li index="'+ s +'" style="max-width: '+ parseInt(options.maxWidth) + 'px; '+ (it.style ? it.style : '') +'">'+
                             ren +'</li>';
@@ -10953,7 +11068,15 @@ var w2confirm = function (obj, callBack) {
                 var div = obj.helpers.multi;
                 var ul  = div.find('ul');
                 div.attr('style', div.attr('style') + ';' + options.style);
-                if ($(obj.el).attr('readonly')) div.addClass('w2ui-readonly'); else div.removeClass('w2ui-readonly');
+                if ($(obj.el).prop('readonly') || $(obj.el).prop('disabled')) {
+                    div.addClass('w2ui-readonly'); 
+                    div.css('pointer-events', 'none').find('li').css('opacity', '0.6');
+                    $(obj.helpers.multi).find('input').prop('readonly', true);                    
+                } else {
+                    div.removeClass('w2ui-readonly');
+                    div.css('pointer-events', 'auto').find('li').css('opacity', '1');
+                    $(obj.helpers.multi).find('input').prop('readonly', false);
+                }
                 // celan
                 div.find('.w2ui-enum-placeholder').remove();
                 ul.find('li').not('li.nomouse').remove();
@@ -10982,7 +11105,7 @@ var w2confirm = function (obj, callBack) {
                         if (eventData.isCancelled === true) return;
                         // default behavior
                         if ($(event.target).hasClass('w2ui-list-remove')) {
-                            if ($(obj.el).attr('readonly')) return;
+                            if ($(obj.el).attr('readonly') || $(obj.el).attr('disabled')) return;
                             // trigger event
                             var eventData = obj.trigger({ phase: 'before', type: 'remove', target: obj.el, originalEvent: event.originalEvent, item: item });
                             if (eventData.isCancelled === true) return;
@@ -11015,7 +11138,7 @@ var w2confirm = function (obj, callBack) {
                             preview += '<div style="padding: 8px;">'+
                                 '    <table cellpadding="2">'+
                                 '    <tr><td '+ td1 +'>Name:</td><td '+ td2 +'>'+ item.name +'</td></tr>'+
-                                '    <tr><td '+ td1 +'>Size:</td><td '+ td2 +'>'+ w2utils.size(item.size) +'</td></tr>'+
+                                '    <tr><td '+ td1 +'>Size:</td><td '+ td2 +'>'+ w2utils.formatSize(item.size) +'</td></tr>'+
                                 '    <tr><td '+ td1 +'>Type:</td><td '+ td2 +'>' +
                                 '        <span style="width: 200px; display: block-inline; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">'+ item.type +'</span>'+
                                 '    </td></tr>'+
@@ -11086,6 +11209,7 @@ var w2confirm = function (obj, callBack) {
             val = String(val).trim();
             // clean
             if (['int', 'float', 'money', 'currency', 'percent'].indexOf(this.type) != -1) {
+                if (typeof val == 'string') val = val.replace(options.decimalSymbol, '.');
                 if (options.autoFormat && ['money', 'currency'].indexOf(this.type) != -1) val = String(val).replace(options.moneyRE, '');
                 if (options.autoFormat && this.type == 'percent') val = String(val).replace(options.percentRE, '');
                 if (options.autoFormat && ['int', 'float'].indexOf(this.type) != -1) val = String(val).replace(options.numberRE, '');
@@ -11147,6 +11271,21 @@ var w2confirm = function (obj, callBack) {
                 $(this.el).next().find('div').css('background-color', color);
                 if ($(obj.el).is(':focus')) this.updateOverlay();
             }
+            // list, enum
+            if (['list', 'enum', 'file'].indexOf(this.type) != -1) {
+                obj.refresh();
+                // need time out to show icon indent properly
+                setTimeout(function () { obj.refresh(); }, 5); 
+            }
+            // date, time
+            if (['date', 'time'].indexOf(this.type) != -1) {
+                // convert linux timestamps
+                var tmp = parseInt(obj.el.value);
+                if (w2utils.isInt(tmp) && tmp > 1000) {
+                    if (this.type == 'time') $(obj.el).val(w2utils.formatTime(new Date(tmp), options.format)).change();
+                    if (this.type == 'date') $(obj.el).val(w2utils.formatDate(new Date(tmp), options.format)).change();
+                }
+            }
         },
 
         click: function (event) {
@@ -11166,13 +11305,13 @@ var w2confirm = function (obj, callBack) {
             var options = this.options;
             // color, date, time
             if (['color', 'date', 'time'].indexOf(obj.type) !== -1) {
-                if ($(obj.el).attr('readonly')) return;
+                if ($(obj.el).attr('readonly') || $(obj.el).attr('disabled')) return;
                 if ($("#w2ui-overlay").length > 0) $('#w2ui-overlay')[0].hide();
                 setTimeout(function () { obj.updateOverlay(); }, 150);
             }
             // menu
             if (['list', 'combo', 'enum'].indexOf(obj.type) != -1) {
-                if ($(obj.el).attr('readonly')) return;
+                if ($(obj.el).attr('readonly') || $(obj.el).attr('disabled')) return;
                 if ($("#w2ui-overlay").length > 0) $('#w2ui-overlay')[0].hide();
                 setTimeout(function () {
                     if (obj.type == 'list' && $(obj.el).is(':focus')) {
@@ -11208,9 +11347,6 @@ var w2confirm = function (obj, callBack) {
             }
             // date or time
             if (['date', 'time'].indexOf(obj.type) != -1) {
-                if (w2utils.isInt(obj.el.value)) {
-                    $(obj.el).val(w2utils.formatDate(new Date(parseInt(obj.el.value)), options.format)).change();
-                }
                 // check if in range
                 if (val !== '' && !obj.inRange(obj.el.value)) {
                     $(obj.el).val('').removeData('selected').change();
@@ -11334,13 +11470,9 @@ var w2confirm = function (obj, callBack) {
             if (obj.type == 'time') {
                 if (!options.keyboard || $(obj.el).attr('readonly')) return;
                 var cancel  = false;
-                var inc        = 1;
-                if (event.ctrlKey || event.metaKey) inc = 60;
-                if (w2utils.isInt(obj.el.value)) {
-                    $(obj.el).val(w2utils.formatTime(new Date(parseInt(obj.el.value)), options.format)).change();
-                }
-                var val = $(obj.el).val();
-                var time = obj.toMin(val) || obj.toMin((new Date()).getHours() + ':' + ((new Date()).getMinutes() - 1));
+                var inc     = (event.ctrlKey || event.metaKey ? 60 : 1);
+                var val     = $(obj.el).val();
+                var time    = obj.toMin(val) || obj.toMin((new Date()).getHours() + ':' + ((new Date()).getMinutes() - 1));
                 switch (key) {
                     case 38: // up
                         if (event.shiftKey) break; // no action if shift key is pressed
@@ -11651,7 +11783,7 @@ var w2confirm = function (obj, callBack) {
                             obj.tmp.xhr_loading = false;
                             obj.tmp.xhr_search  = search;
                             obj.tmp.xhr_total   = data.items.length;
-                            options.items       = data.items;
+                            options.items       = obj.normMenu(data.items);
                             if (search == '' && data.items.length == 0) obj.tmp.emptySet = true; else obj.tmp.emptySet = false;
                             obj.search();
                             // console.log('-->', 'retrieved:', obj.tmp.xhr_total);
@@ -11845,7 +11977,7 @@ var w2confirm = function (obj, callBack) {
                         css: { "background-color": "#fff" }
                     });
                 }
-                var h24 = (this.options.format == 'h24' ? true : false);
+                var h24 = (this.options.format == 'h24');
                 $('#w2ui-overlay > div').html(obj.getHourHTML());
                 $('#w2ui-overlay .w2ui-time')
                     .on('mousedown', function (event) {
@@ -11923,10 +12055,7 @@ var w2confirm = function (obj, callBack) {
                                 }
                             } else {
                                 $(obj.el).data('selected', event.item).val(event.item.text).change();
-                                if (obj.helpers.focus) {
-                                    obj.helpers.focus.find('input').val('');
-                                    obj.refresh(); 
-                                }
+                                if (obj.helpers.focus) obj.helpers.focus.find('input').val('');
                             }
                         }
                     }));
@@ -11979,16 +12108,16 @@ var w2confirm = function (obj, callBack) {
             var obj = this;
             switch (obj.type) {
                 case 'int':
-                    if (loose && ['-'].indexOf(ch) != -1) return true;
+                    if (loose && ['-', obj.options.groupSymbol].indexOf(ch) != -1) return true;
                     return w2utils.isInt(ch.replace(obj.options.numberRE, ''));
                 case 'percent':
                     ch = ch.replace(/%/g, '');
                 case 'float':
-                    if (loose && ['-','.'].indexOf(ch) != -1) return true;
+                    if (loose && ['-', w2utils.settings.decimalSymbol, obj.options.groupSymbol].indexOf(ch) != -1) return true;
                     return w2utils.isFloat(ch.replace(obj.options.numberRE, ''));
                 case 'money':
                 case 'currency':
-                    if (loose && ['-', '.', obj.options.groupSymbol, obj.options.currencyPrefix, obj.options.currencySuffix].indexOf(ch) != -1) return true;
+                    if (loose && ['-', obj.options.decimalSymbol, obj.options.groupSymbol, obj.options.currencyPrefix, obj.options.currencySuffix].indexOf(ch) != -1) return true;
                     return w2utils.isFloat(ch.replace(obj.options.moneyRE, ''));
                 case 'hex':
                 case 'color':
@@ -12008,9 +12137,9 @@ var w2confirm = function (obj, callBack) {
                 if (tmp['old-padding-left']) $(obj.el).css('padding-left', tmp['old-padding-left']);
                 tmp['old-padding-left'] = $(obj.el).css('padding-left');
                 $(obj.el).data('tmp', tmp);
+                // remove if already displaed
+                if (obj.helpers.prefix) $(obj.helpers.prefix).remove();
                 if (obj.options.prefix !== '') {
-                    // remove if already displaed
-                    if (obj.helpers.prefix) $(obj.helpers.prefix).remove();
                     // add fresh
                     $(obj.el).before(
                         '<div class="w2ui-field-helper">'+
@@ -12027,7 +12156,7 @@ var w2confirm = function (obj, callBack) {
                             'padding-bottom' : $(obj.el).css('padding-bottom'),
                             'padding-left'   : $(obj.el).css('padding-left'),
                             'padding-right'  : 0,
-                            'margin-top'     : (parseInt($(obj.el).css('margin-top'), 10) + 1) + 'px',
+                            'margin-top'     : (parseInt($(obj.el).css('margin-top'), 10) + 2) + 'px',
                             'margin-bottom'  : (parseInt($(obj.el).css('margin-bottom'), 10) + 1) + 'px',
                             'margin-left'    : $(obj.el).css('margin-left'),
                             'margin-right'   : 0
@@ -12094,13 +12223,14 @@ var w2confirm = function (obj, callBack) {
                         })
                         .css('margin-left', '-'+ (helper.width() + parseInt($(obj.el).css('margin-right'), 10) + 12) + 'px')
                         .on('mousedown', function (event) {
-                            $('body').on('mouseup', tmp);
-                            $('body').data('_field_update_timer', setTimeout(update, 700));
+                            var body = $('body');
+                            body.on('mouseup', tmp);
+                            body.data('_field_update_timer', setTimeout(update, 700));
                             update(false);
                             // timer function
                             function tmp() {
-                                clearTimeout($('body').data('_field_update_timer'));
-                                $('body').off('mouseup', tmp);
+                                clearTimeout(body.data('_field_update_timer'));
+                                body.off('mouseup', tmp);
                             }
                             // update function
                             function update(notimer) {
@@ -12134,7 +12264,7 @@ var w2confirm = function (obj, callBack) {
                             'padding-bottom' : $(obj.el).css('padding-bottom'),
                             'padding-left'   : '3px',
                             'padding-right'  : $(obj.el).css('padding-right'),
-                            'margin-top'     : (parseInt($(obj.el).css('margin-top'), 10) + 1) + 'px',
+                            'margin-top'     : (parseInt($(obj.el).css('margin-top'), 10) + 2) + 'px',
                             'margin-bottom'  : (parseInt($(obj.el).css('margin-bottom'), 10) + 1) + 'px'
                         })
                         .on('click', function (event) {
@@ -12158,13 +12288,12 @@ var w2confirm = function (obj, callBack) {
             var obj      = this;
             var options  = this.options;
             var width    = 0; // 11 - show search icon, 0 do not show
-            if (options.icon) width = 11;
             // clean up & init
             $(obj.helpers.focus).remove();
             // build helper
             var html =
                 '<div class="w2ui-field-helper">'+ 
-                '    <div class="w2ui-icon icon-search" style="position: absolute; opacity: 0; margin-top: 4px; margin-left: 2px; width: '+ width +'px !important; background-position: left !important;"></div>'+
+                '    <div class="w2ui-icon icon-search"></div>'+
                 '    <input type="text" autocomplete="off">'+
                 '<div>';
             $(obj.el).attr('tabindex', -1).before(html);
@@ -12187,7 +12316,7 @@ var w2confirm = function (obj, callBack) {
                     border   : '1px solid transparent',
                     padding  : $(obj.el).css('padding-top'),
                     "padding-left"     : 0,
-                    "margin-left"      : width + (width > 0 ? 6 : 0),
+                    "margin-left"      : (width > 0 ? width + 6 : 0),
                     "background-color" : 'transparent'
                 });
             // INPUT events
@@ -12209,8 +12338,8 @@ var w2confirm = function (obj, callBack) {
                     $(obj.el).triggerHandler('blur');
                     if (event.stopPropagation) event.stopPropagation(); else event.cancelBubble = true;
                 })
-                .on('keyup',     function (event) { obj.keyUp(event) })
-                .on('keydown',     function (event) { obj.keyDown(event) })
+                .on('keyup',    function (event) { obj.keyUp(event) })
+                .on('keydown',  function (event) { obj.keyDown(event) })
                 .on('keypress', function (event) { obj.keyPress(event); });
             // MAIN div
             helper.on('click', function (event) { $(this).find('input').focus(); });
@@ -12239,7 +12368,7 @@ var w2confirm = function (obj, callBack) {
                         '    <ul>'+
                         '        <li style="padding-left: 0px; padding-right: 0px" class="nomouse">'+
                         '            <input type="text" style="width: 20px" autocomplete="off" '+ ($(obj.el).attr('readonly') ? 'readonly': '') + '>'+
-                        '        </li>'
+                        '        </li>'+
                         '    </ul>'+
                         '    </div>'+
                         '</div>';
@@ -12248,7 +12377,7 @@ var w2confirm = function (obj, callBack) {
                 html =  '<div class="w2ui-field-helper w2ui-list" style="'+ margin + '; box-sizing: border-box">'+
                         '    <div style="padding: 0px; margin: 0px; margin-right: 20px; display: inline-block">'+
                         '    <ul><li style="padding-left: 0px; padding-right: 0px" class="nomouse"></li></ul>'+
-                        '    <input class="file-input" type="file" name="attachment" multiple style="display: none" tabindex="-1">'
+                        '    <input class="file-input" type="file" name="attachment" multiple style="display: none" tabindex="-1">'+
                         '    </div>'+
                         '</div>';
             }
@@ -12345,19 +12474,23 @@ var w2confirm = function (obj, callBack) {
             var size = 0;
             var cnt  = 0;
             var err;
-            for (var s in selected) { size += selected[s].size; cnt++; }
+            for (var s in selected) { 
+                // check for dups
+                if (selected[s].name == file.name && selected[s].size == file.size) return;
+                size += selected[s].size; cnt++; 
+            }
             // trigger event
             var eventData = obj.trigger({ phase: 'before', type: 'add', target: obj.el, file: newItem, total: cnt, totalSize: size });
             if (eventData.isCancelled === true) return;
             // check params
             if (options.maxFileSize !== 0 && newItem.size > options.maxFileSize) {
-                err = 'Maximum file size is '+ w2utils.size(options.maxFileSize);
+                err = 'Maximum file size is '+ w2utils.formatSize(options.maxFileSize);
                 if (options.silent === false) $(obj.el).w2tag(err);
                 console.log('ERROR: '+ err);
                 return;
             }
             if (options.maxSize !== 0 && size + newItem.size > options.maxSize) {
-                err = 'Maximum total size is '+ w2utils.size(options.maxSize);
+                err = 'Maximum total size is '+ w2utils.formatSize(options.maxSize);
                 if (options.silent === false) $(obj.el).w2tag(err);
                 console.log('ERROR: '+ err);
                 return;
@@ -12404,7 +12537,7 @@ var w2confirm = function (obj, callBack) {
                 }
                 return menu;
             } else if (typeof menu == 'object') {
-                var tmp = []
+                var tmp = [];
                 for (var m in menu) tmp.push({ id: m, text: menu[m] });
                 return tmp;
             }
@@ -12485,9 +12618,9 @@ var w2confirm = function (obj, callBack) {
                 var bgcol   = '';
                 var tmp_dt  = w2utils.formatDate(dt, this.options.format);
                 if (this.options.colored && this.options.colored[tmp_dt] !== undefined) { // if there is predefined colors for dates
-                    tmp   = this.options.colored[tmp_dt].split(':');
-                    bgcol = 'background-color: ' + tmp[0] + ';';
-                    col   = 'color: ' + tmp[1] + ';';
+                    var tmp = this.options.colored[tmp_dt].split(':');
+                    bgcol   = 'background-color: ' + tmp[0] + ';';
+                    col     = 'color: ' + tmp[1] + ';';
                 }
                 html += '<td class="'+ (this.inRange(tmp_dt) ? 'w2ui-date ' : 'w2ui-blocked') + className + '" style="'+ col + bgcol + '" date="'+ tmp_dt +'">'+
                             dspDay +
@@ -12514,7 +12647,7 @@ var w2confirm = function (obj, callBack) {
 
         getHourHTML: function () {
             var tmp = [];
-            var h24 = (this.options.format == 'h24' ? true : false);
+            var h24 = (this.options.format == 'h24');
             for (var a=0; a<24; a++) {
                 var time = (a >= 12 && !h24 ? a - 12 : a) + ':00' + (!h24 ? (a < 12 ? ' am' : ' pm') : '');
                 if (a == 12 && !h24) time = '12:00 pm';
@@ -12534,7 +12667,7 @@ var w2confirm = function (obj, callBack) {
 
         getMinHTML: function (hour) {
             if (typeof hour == 'undefined') hour = 0;
-            var h24 = (this.options.format == 'h24' ? true : false);
+            var h24 = (this.options.format == 'h24');
             var tmp = [];
             for (var a=0; a<60; a+=5) {
                 var time = (hour > 12 && !h24 ? hour - 12 : hour) + ':' + (a < 10 ? 0 : '') + a + ' ' + (!h24 ? (hour < 12 ? 'am' : 'pm') : '');
@@ -12577,7 +12710,7 @@ var w2confirm = function (obj, callBack) {
             }
             return ret;
         }
-    }
+    };
 
     $.extend(w2field.prototype, w2utils.event);
     w2obj.field = w2field;
@@ -12600,14 +12733,12 @@ var w2confirm = function (obj, callBack) {
 *   - verify validation of fields
 *   - when field is blank, set record.field = null
 *   - show/hide a field
-*
-* == 1.4 Changes ==
-*   - refactored for the new fields
 *   - added getChanges() - not complete
-*   - change: get() w/o params returns all field names
-*   - changed template structure for formHTML
-*   - added toggle type - On/Off
-*   - added routeData
+*   - nested record object
+*
+* == 1.5 changes
+*   - $('#form').w2form() - if called w/o argument then it returns form object
+*   - added onProgress
 *
 ************************************************************************/
 
@@ -12644,6 +12775,7 @@ var w2confirm = function (obj, callBack) {
         this.onLoad      = null;
         this.onValidate  = null;
         this.onSubmit    = null;
+        this.onProgress  = null;
         this.onSave      = null;
         this.onChange    = null;
         this.onRender    = null;
@@ -12658,7 +12790,7 @@ var w2confirm = function (obj, callBack) {
         this.isGenerated = false;
         this.last = {
             xhr: null        // jquery xhr requests
-        }
+        };
 
         $.extend(true, this, w2obj.form, options);
     };
@@ -12667,7 +12799,7 @@ var w2confirm = function (obj, callBack) {
     // -- Registers as a jQuery plugin
 
     $.fn.w2form = function(method) {
-        if (typeof method === 'object' || !method ) {
+        if ($.isPlainObject(method)) {
             var obj = this;
             // check name parameter
             if (!w2utils.checkName(method, 'w2form')) return;
@@ -12742,12 +12874,15 @@ var w2confirm = function (obj, callBack) {
             }
             return object;
 
-        } else if (w2ui[$(this).attr('name')]) {
-            var obj = w2ui[$(this).attr('name')];
-            obj[method].apply(obj, Array.prototype.slice.call(arguments, 1));
-            return this;
         } else {
-            console.log('ERROR: Method ' +  method + ' does not exist on jQuery.w2form');
+            var obj = w2ui[$(this).attr('name')];
+            if (!obj) return null;
+            if (arguments.length > 0) {
+                if (obj[method]) obj[method].apply(obj, Array.prototype.slice.call(arguments, 1));
+                return this;
+            } else {
+                return obj;
+            }
         }
     };
 
@@ -12915,7 +13050,7 @@ var w2confirm = function (obj, callBack) {
                     }
                 }
                 return result;
-            }
+            };
             return differ(this.record, this.original, {});
         },
 
@@ -12947,13 +13082,13 @@ var w2confirm = function (obj, callBack) {
             this.lock(this.msgRefresh);
             var url = eventData.url;
             if (typeof eventData.url == 'object' && eventData.url.get) url = eventData.url.get;
-            if (this.last.xhr) try { this.last.xhr.abort(); } catch (e) {};
+            if (this.last.xhr) try { this.last.xhr.abort(); } catch (e) {}
             // process url with routeData
             if (!$.isEmptyObject(obj.routeData)) {
                 var info  = w2utils.parseRoute(url);
                 if (info.keys.length > 0) {
                     for (var k = 0; k < info.keys.length; k++) {
-                        if (!obj.routeData[info.keys[k].name]) continue;
+                        if (obj.routeData[info.keys[k].name] == null) continue;
                         url = url.replace((new RegExp(':'+ info.keys[k].name, 'g')), obj.routeData[info.keys[k].name]);
                     }
                 }
@@ -13088,13 +13223,13 @@ var w2confirm = function (obj, callBack) {
                 // default action
                 var url = eventData.url;
                 if (typeof eventData.url == 'object' && eventData.url.save) url = eventData.url.save;
-                if (obj.last.xhr) try { obj.last.xhr.abort(); } catch (e) {};
+                if (obj.last.xhr) try { obj.last.xhr.abort(); } catch (e) {}
                 // process url with routeData
                 if (!$.isEmptyObject(obj.routeData)) {
                     var info  = w2utils.parseRoute(url);
                     if (info.keys.length > 0) {
                         for (var k = 0; k < info.keys.length; k++) {
-                            if (!obj.routeData[info.keys[k].name]) continue;
+                            if (obj.routeData[info.keys[k].name] == null) continue;
                             url = url.replace((new RegExp(':'+ info.keys[k].name, 'g')), obj.routeData[info.keys[k].name]);
                         }
                     }
@@ -13109,12 +13244,17 @@ var w2confirm = function (obj, callBack) {
                         // upload
                         xhr.upload.addEventListener("progress", function(evt) {
                             if (evt.lengthComputable) {
+                                var eventData3 = obj.trigger({ phase: 'before', type: 'progress', total: evt.total, loaded: evt.loaded, originalEvent: evt });
+                                if (eventData3.isCancelled === true) return;
+                                // default behavior
                                 var percent = Math.round(evt.loaded / evt.total * 100);
                                 $('#'+ obj.name + '_progress').text(''+ percent + '%');
+                                // event after
+                                obj.trigger($.extend(eventData3, { phase: 'after' }));
                             }
                         }, false);
                         return xhr;
-                    },
+                    }
                 };
                 if (w2utils.settings.dataType == 'HTTP') {
                     ajaxOptions.data = String($.param(ajaxOptions.data, false)).replace(/%5B/g, '[').replace(/%5D/g, ']');
@@ -13241,8 +13381,8 @@ var w2confirm = function (obj, callBack) {
                     group = '';
                 }
                 html += '\n      <div class="w2ui-field '+ (typeof field.html.span != 'undefined' ? 'w2ui-span'+ field.html.span : '') +'">'+ 
-                        '\n         <label>' + field.html.caption +'</label>'+
-                        '\n         <div>'+ input + field.html.text + '</div>'+
+                        '\n         <label>' + w2utils.lang(field.html.caption) +'</label>'+
+                        '\n         <div>'+ input + w2utils.lang(field.html.text) + '</div>'+
                         '\n      </div>';
                 if (typeof pages[field.html.page] == 'undefined') pages[field.html.page] = '';
                 pages[field.html.page] += html;
@@ -13260,7 +13400,7 @@ var w2confirm = function (obj, callBack) {
                 buttons += '\n<div class="w2ui-buttons">';
                 for (var a in this.actions) {
                     if (['save', 'update', 'create'].indexOf(a.toLowerCase()) != -1) addClass = 'btn-green'; else addClass = '';
-                    buttons += '\n    <button name="'+ a +'" class="btn '+ addClass +'">'+ a + '</button>';
+                    buttons += '\n    <button name="'+ a +'" class="btn '+ addClass +'">'+ w2utils.lang(a) +'</button>';
                 }
                 buttons += '\n</div>';
             }
@@ -13484,17 +13624,20 @@ var w2confirm = function (obj, callBack) {
                     // enums
                     case 'list':
                     case 'combo':
-                        if (field.type == 'list' && !$.isPlainObject(value)) {
+                        if (field.type == 'list') {
+                            var tmp_value = ($.isPlainObject(value) ? value.id : value);
+                            // normalized options
+                            var items = field.options.items;
+                            if ($.isArray(items) && items.length > 0 && !$.isPlainObject(items[0])) {
+                                field.options.items = w2obj.field.prototype.normMenu(items);
+                            }
                             // find value from items 
                             for (var i in field.options.items) {
                                 var item = field.options.items[i];
-                                if ($.isPlainObject(item) && item.id == value) {
+                                if (item.id == tmp_value) {
                                     value = $.extend(true, {}, item);
                                     obj.record[field.name] = value;
-                                    break;
-                                } else if (i == value) {
-                                    value = { id: i, text: item };
-                                    obj.record[field.name] = value;
+                                    console.log(1);
                                     break;
                                 }
                             }
@@ -13653,705 +13796,4 @@ var w2confirm = function (obj, callBack) {
 
     $.extend(w2form.prototype, w2utils.event);
     w2obj.form = w2form;
-})();
-
-/************************************************************************
-*   Library: Web 2.0 UI for jQuery (using prototypical inheritance)
-*   - Following objects defined
-*        - w2listview        - listview widget
-*        - $().w2listview    - jQuery wrapper
-*   - Dependencies: jQuery, w2utils
-*
-* == NICE TO HAVE ==
-*   - images support via 'src' attribute
-*
-************************************************************************/
-
-(function () {
-    var w2listview = function (options) {
-        this.box           = null;        // DOM Element that holds the element
-        this.name          = null;        // unique name for w2ui
-        this.vType         = null;
-        this.extraCols     = [];
-        this.itemExtra     = {};
-        this.items         = [];
-        this.menu          = [];
-        this.multiselect   = true;        // multiselect support
-        this.keyboard      = true;        // keyboard support
-        this.curFocused    = null;        // currently focused item
-        this.selStart      = null;        // item to start selection from (used in selection with "shift" key)
-        this.onClick       = null;
-        this.onDblClick    = null;
-        this.onKeydown     = null;
-        this.onContextMenu = null;
-        this.onMenuClick   = null;        // when context menu item selected
-        this.onRender      = null;
-        this.onRefresh     = null;
-        this.onDestroy     = null;
-
-        $.extend(this, { handlers: [] });
-        $.extend(true, this, w2obj.listview, options);
-        for (var i = 0; i < this.extraCols.length; i++) {
-            this.itemExtra[this.extraCols[i].name] = '';
-        }
-    };
-
-    // ====================================================
-    // -- Registers as a jQuery plugin
-
-    $.fn.w2listview = function(method) {
-        var obj;
-        if (typeof method === 'object' || !method ) {
-            // check name parameter
-            if (!w2utils.checkName(method, 'w2listview')) return undefined;
-            if (typeof method.viewType !== 'undefined') {
-                method.vType = method.viewType;
-                delete method.viewType;
-            }
-            var itms = method.items;
-            obj = new w2listview(method);
-            if ($.isArray(itms)) {
-                for (var i = 0; i < itms.length; i++) {
-                    obj.items[i] = $.extend({}, w2listview.prototype.item, obj.itemExtra, itms[i]);
-                }
-            }
-            if ($(this).length !== 0) {
-                obj.render($(this)[0]);
-            }
-            // register new object
-            w2ui[obj.name] = obj;
-            return obj;
-        } else if (w2ui[$(this).attr('name')]) {
-            obj = w2ui[$(this).attr('name')];
-            obj[method].apply(obj, Array.prototype.slice.call(arguments, 1));
-            return this;
-        } else {
-            console.log('ERROR: Method ' +  method + ' does not exist on jQuery.w2listview' );
-            return undefined;
-        }
-    };
-
-    // ====================================================
-    // -- Implementation of core functionality
-
-    w2listview.prototype = {
-        item : {
-            id            : null,        // param to be sent to all event handlers
-            caption       : '',
-            description   : '',
-            icon          : null,
-            img           : null,
-            selected      : false,
-            onClick       : null,
-            onDblClick    : null,
-            onKeydown     : null,
-            onContextMenu : null,
-            onRefresh     : null
-        },
-
-        viewType: function (value) {
-            if (arguments.length === 0) {
-                switch (this.vType) {
-                    case 'table':
-                        return 'table';
-                    case 'icon-tile':
-                        return 'icon-tile';
-                    case 'icon-large':
-                        return 'icon-large';
-                    case 'icon-medium':
-                        return 'icon-medium';
-                    default:
-                        return 'icon-small';
-                }
-            } else {
-                this.vType = value;
-                var vt = 'w2ui-' + this.viewType();
-                $(this.box)
-                    .removeClass('w2ui-icon-small w2ui-icon-medium w2ui-icon-large w2ui-icon-tile w2ui-table')
-                    .addClass(vt);
-                return vt;
-            }
-        },
-
-        add: function (item) {
-            return this.insert(null, item);
-        },
-
-        insert: function (id, item) {
-            if (!$.isArray(item)) item = [item];
-            // assume it is array
-            for (var i = 0; i < item.length; i++) {
-                // checks
-                if (typeof item[i].id === 'undefined') {
-                    console.log('ERROR: The parameter "id" is required but not supplied. (obj: '+ this.name +')');
-                    return;
-                }
-                if (!w2utils.checkUniqueId(item[i].id, this.items, 'items', this.name)) return;
-                // add item
-                var newItm = $.extend({}, w2listview.prototype.item, this.itemExtra, item[i]);
-                if (id === null || typeof id === 'undefined') {
-                    this.items.push(newItm);
-                } else {
-                    var middle = this.get(id, true);
-                    this.items = this.items.slice(0, middle).concat([newItm], this.items.slice(middle));
-                }
-                this.refresh(item[i].id);
-            }
-        },
-
-        remove: function (id) {
-            var removed = 0;
-            for (var i = 0; i < arguments.length; i++) {
-                var idx = this.get(arguments[i], true);
-                if (idx === null) return false;
-                removed++;
-                // remove from array
-                this.items.splice(idx, 1);
-                // remove from screen
-                $(this.itemNode(arguments[i])).remove();
-            }
-            return removed;
-        },
-
-        set: function (id, item) {
-            var idx = this.get(id, true);
-            if (idx === null) return false;
-            $.extend(this.items[idx], item);
-            this.refresh(id);
-            return true;
-        },
-
-        get: function (id, returnIndex) {
-            var i = 0;
-            if (arguments.length === 0) {
-                var all = [];
-                for (; i < this.items.length; i++) {
-                    if (this.items[i].id !== null) all.push(this.items[i].id);
-                }
-                return all;
-            }
-            for (; i < this.items.length; i++) {
-                if (this.items[i].id === id) {
-                    if (returnIndex === true) return i; else return this.items[i];
-                }
-            }
-            return null;
-        },
-
-        select: function (id, addSelection) {
-            var itm = this.get(id);
-            if (itm === null) return false;
-            if (arguments.length === 1 || !this.multiselect) addSelection = false;
-
-            if (!addSelection) this.unselect();
-            if (!itm.selected) {
-                $(this.itemNode(itm.id)).addClass('w2ui-selected');
-                itm.selected = true;
-            }
-            return itm.selected;
-        },
-
-        unselect: function (id) {
-            var obj = this;
-            var i = 0;
-            if (arguments.length === 0) {
-                for (; i < this.items.length; i++) doUnselect(this.items[i]);
-            } else {
-                for (; i < arguments.length; i++) doUnselect(this.get(arguments[i]));
-            }
-            return true;
-
-            function doUnselect(itm) {
-                if (itm !== null && itm.selected) {
-                    $(obj.itemNode(itm.id)).removeClass('w2ui-selected');
-                    itm.selected = false;
-                }
-            }
-        },
-
-        getFocused: function (returnIndex) {
-            var rslt = this.get(this.curFocused, returnIndex);
-            if (rslt === null) rslt = this.get(this.selStart, returnIndex);
-            return rslt;
-        },
-
-        scrollIntoView: function (id) {
-            if (typeof id !== 'undefined') {
-                var node = this.itemNode(id);
-                if (node === null) return;
-                var nodeOffset = this.itemNodeOffsetInfo(node);
-                if (nodeOffset.top < this.box.scrollTop) {
-                    $(this.box).scrollTop(nodeOffset.top);
-                } else if (nodeOffset.bottom > this.box.scrollTop + this.box.offsetHeight) {
-                    $(this.box).scrollTop(nodeOffset.bottom - this.box.offsetHeight);
-                }
-            }
-        },
-
-        userSelect: function (id, event, isMouse) {
-            var itm = null;
-
-            // update selection
-            if (event.shiftKey) {
-                this.unselect();
-                var fIdx = this.get(this.selStart, true);
-                if (fIdx !== null) {
-                    var idx = this.get(id, true);
-                    var toIdx = Math.max(idx, fIdx);
-                    for (var i = Math.min(idx, fIdx); i <= toIdx; i++) {
-                        this.select(this.items[i].id, true);
-                    }
-                } else {
-                    this.select(id, true);
-                    this.selStart = id;
-                }
-            } else if (event.ctrlKey) {
-                if (isMouse) {
-                    itm = this.get(id);
-                    if (itm.selected) this.unselect(id); else this.select(id, true);
-                    this.selStart = id;
-                }
-            } else {
-                this.select(id, false);
-                this.selStart = id;
-            }
-
-            // update focus
-            if (itm === null) itm = this.get(id);
-            if (itm === null) return;
-            var oldItm = this.getFocused();
-            if (oldItm !== null) {
-                $(this.itemNode(oldItm.id)).removeClass('w2ui-focused');
-            }
-            $(this.itemNode(id)).addClass('w2ui-focused');
-            this.curFocused = id;
-
-            // update view
-            this.scrollIntoView(id);
-        },
-
-        // ===================================================
-        // -- Internal Event Handlers
-
-        click: function (id, event) {
-            var idx = this.get(id, true);
-            if (idx === null) return false;
-            var eventData = this.trigger({ phase: 'before', type: 'click', target: id, originalEvent: event, object: this.items[idx] });
-            var rslt = eventData.isCancelled !== true;
-            if (rslt) {
-                // default action
-                this.userSelect(id, event, true);
-                // event after
-                this.trigger($.extend(eventData, { phase: 'after' }));
-            }
-            return rslt;
-        },
-
-        dblClick: function (id, event) {
-            var itm = this.get(id);
-            if (itm === null) return false;
-            var eventData = this.trigger({ phase: 'before', type: 'dblClick', target: id, originalEvent: event, object: itm });
-            var rslt = eventData.isCancelled !== true;
-            if (rslt) {
-                // default action
-                // -- empty
-                // event after
-                this.trigger($.extend(eventData, { phase: 'after' }));
-            }
-            return rslt;
-        },
-
-        keydown: function (event) {
-            var obj = this;
-            var idx = this.getFocused(true);
-            if (idx === null || obj.keyboard !== true) return false;
-            var eventData = obj.trigger({ phase: 'before', type: 'keydown', target: obj.name, originalEvent: event });
-            var rslt = eventData.isCancelled !== true;
-            if (rslt) {
-                // default behaviour
-                var cancelProcessing = true;
-                switch (event.keyCode) {
-                    case 13:
-                        obj.dblClick(obj.items[idx].id, event);
-                        break;
-                    case 32:
-                        obj.click(obj.items[idx].id, event);
-                        break;
-                    case 33:
-                        processNeighbor('pgUp');
-                        break;
-                    case 34:
-                        processNeighbor('pgDown');
-                        break;
-                    case 36:
-                        processNeighbor('home');
-                        break;
-                    case 35:
-                        processNeighbor('end');
-                        break;
-                    case 37:
-                        processNeighbor('left');
-                        break;
-                    case 38:
-                        processNeighbor('up');
-                        break;
-                    case 39:
-                        processNeighbor('right');
-                        break;
-                    case 40:
-                        processNeighbor('down');
-                        break;
-                    default:
-                        cancelProcessing = false;
-                }
-                // cancel event if needed
-                if (cancelProcessing) {
-                    if (event.preventDefault) event.preventDefault();
-                    if (event.stopPropagation) event.stopPropagation();
-                }
-
-                // event after
-                obj.trigger($.extend(eventData, { phase: 'after' }));
-            }
-            return rslt;
-
-            function processNeighbor(neighbor) {
-                var newIdx = getNeighborIdx(neighbor);
-                if (newIdx >= 0 && newIdx < obj.items.length && newIdx !== idx) {
-                    obj.userSelect(obj.items[newIdx].id, event, false);
-                }
-            }
-
-            function getNeighborIdx(neighbor) {
-                var colsCnt = colsCount();
-                var newIdx, itmOffset;
-                switch (neighbor) {
-                    case 'up':
-                        return idx - colsCnt;
-                    case 'down':
-                        return idx + colsCnt;
-                    case 'left':
-                        return (colsCnt > 1) ? idx - 1 : idx;
-                    case 'right':
-                        return (colsCnt > 1) ? idx + 1 : idx;
-                    case 'pgUp':
-                        if (idx < colsCnt) return 0;
-                        itmOffset = obj.itemNodeOffsetInfo(obj.itemNode(obj.items[idx].id));
-                        var minTop = itmOffset.bottom - obj.box.offsetHeight - allowedOverflow(itmOffset);
-                        newIdx = idx;
-                        while (newIdx >= colsCnt) {
-                            newIdx -= colsCnt;
-                            if (obj.itemNodeOffsetInfo(obj.itemNode(obj.items[newIdx].id)).top < minTop) {
-                                newIdx += colsCnt;
-                                break;
-                            }
-                        }
-                        return newIdx;
-                    case 'pgDown':
-                        if (idx >= obj.items.length - colsCnt) return obj.items.length - 1;
-                        itmOffset = obj.itemNodeOffsetInfo(obj.itemNode(obj.items[idx].id));
-                        var maxBottom = itmOffset.top + obj.box.offsetHeight + allowedOverflow(itmOffset);
-                        newIdx = idx;
-                        while (newIdx < obj.items.length - colsCnt) {
-                            newIdx += colsCnt;
-                            if (obj.itemNodeOffsetInfo(obj.itemNode(obj.items[newIdx].id)).bottom > maxBottom) {
-                                newIdx -= colsCnt;
-                                break;
-                            }
-                        }
-                        return newIdx;
-                    case 'home':
-                        return 0;
-                    case 'end':
-                        return obj.items.length - 1;
-                    default:
-                        return idx;
-                }
-
-                function allowedOverflow(offset) {
-                    return parseInt((offset.bottom - offset.top) / 2);
-                }
-            }
-
-            function colsCount() {
-                var vt = obj.viewType();
-                if (vt === 'table') return 1;
-                return parseInt($(obj.box).find('> ul').width() / itemWidth(vt), 10);
-            }
-
-            function itemWidth(viewType) {
-                obj.itemWidths = obj.itemWidths || {};
-                if (!(viewType in obj.itemWidths)) {
-                    var itm = obj.itemNode(obj.items[idx].id);
-                    obj.itemWidths[viewType] = w2utils.getSize(itm, 'width');
-                }
-                return obj.itemWidths[viewType];
-            }
-        },
-
-        contextMenu: function (id, event) {
-            var obj = this;
-            var itm = this.get(id);
-            if (itm === null) return false;
-            if (!itm.selected) obj.select(id);
-            var eventData = obj.trigger({ phase: 'before', type: 'contextMenu', target: id, originalEvent: event, object: itm });
-            var rslt = eventData.isCancelled !== true;
-            if (rslt) {
-                // default action
-                if (obj.menu.length > 0) {
-                    $(obj.itemNode(id))
-                        .w2menu(obj.menu, {
-                            left: (event ? event.offsetX || event.pageX : 50) - 25,
-                            select: function (item, event, index) { obj.menuClick(id, index, event); }
-                        });
-                }
-                // event after
-                obj.trigger($.extend(eventData, { phase: 'after' }));
-            }
-            return false;
-        },
-
-        menuClick: function (itemId, index, event) {
-            // event before
-            var eventData = this.trigger({ phase: 'before', type: 'menuClick', target: itemId, originalEvent: event, menuIndex: index, menuItem: this.menu[index] });
-            var rslt = eventData.isCancelled !== true;
-            if (rslt) {
-                // default action
-                // -- empty
-                // event after
-                this.trigger($.extend(eventData, { phase: 'after' }));
-            }
-            return rslt;
-        },
-
-        itemNodeId: function (id) {
-            return 'lv_' + this.name + '_itm_' + id;
-        },
-
-        itemNode: function (id) {
-            return document.getElementById(this.itemNodeId(id));
-        },
-
-        itemNodeOffsetInfo: function (node) {
-            var vt = this.viewType();
-            this.itemSpacing = this.itemSpacing || {};
-            if (!(vt in this.itemSpacing)) {
-                var $node = $(node);
-                this.itemSpacing[vt] = (parseInt($node.css('margin-top')) || 0) + (parseInt($node.css('margin-bottom')) || 0);
-            }
-            return {
-                top: node.offsetTop - this.itemSpacing[vt],
-                bottom: node.offsetTop + node.offsetHeight + this.itemSpacing[vt]
-            };
-        },
-
-        refresh: function (id) {
-            var obj = this;
-            var time = (new Date()).getTime();
-
-            var idx;
-            if (typeof id !== 'undefined') {
-                idx = this.get(id, true);
-                if (idx === null) return false;
-            }
-
-            // event before
-            var eventData = this.trigger({ phase: 'before', type: 'refresh', target: (typeof id !== 'undefined' ? id : this.name), object: this.items[idx] });
-            if (eventData.isCancelled === true) return;
-
-            // default action
-            if (typeof id === 'undefined') {
-                // refresh all items
-                var itms = document.createDocumentFragment();
-                for (var i = 0; i < this.items.length; i++)
-                    itms.appendChild(getItemElement(this.items[i]));
-                var lst = this.lastItm.parentNode;
-                while (lst.firstChild !== this.lastItm)
-                    lst.removeChild(lst.firstChild);
-                this.lastItm.parentNode.insertBefore(itms, this.lastItm);
-            } else {
-                // refresh single item
-                var itm = this.itemNode(id);
-                if (itm) {
-                    // update existing
-                    itm.parentNode.replaceChild(getItemElement(this.items[idx]), itm);
-                } else {
-                    // create new
-                    var nextItm;
-                    if (idx !== this.items.length-1) nextItm = this.itemNode(this.items[idx+1].id);
-                    if (!nextItm) nextItm = this.lastItm;
-                    nextItm.parentNode.insertBefore(getItemElement(this.items[idx]), nextItm);
-                }
-            }
-
-            // event after
-            this.trigger($.extend(eventData, { phase: 'after' }));
-
-            return (new Date()).getTime() - time;
-
-            function getItemElement(item) {
-                var imgClass = (item.icon !== null && typeof item.icon !== 'undefined') ? ' '+item.icon : ' icon-none';
-                if (item.img !== null && typeof item.img !== 'undefined') imgClass = ' w2ui-icon '+item.img;
-
-                var withDescription = (typeof item.description !== 'undefined' && item.description !== '');
-                var withExtra = (obj.extraCols.length > 0);
-                var rslt = getItemTemplate(withDescription, withExtra);
-                rslt.id = obj.itemNodeId(item.id);
-                rslt.setAttribute('item_id', item.id);
-                var itmDiv = rslt.querySelector('div');
-                itmDiv.querySelector('div.w2ui-listview-img').className = 'w2ui-listview-img'+imgClass;
-                itmDiv.querySelector('div.caption').textContent = item.caption;
-                if (withDescription) {
-                    itmDiv.querySelector('div.description').textContent = item.description;
-                }
-                if (withExtra) {
-                    var itmExtra = itmDiv.querySelector('div.extra div');
-                    for (var i = 0; i < obj.extraCols.length; i++) {
-                        var colName = obj.extraCols[i].name;
-                        if (colName in item) {
-                            itmExtra.querySelector('div.'+colName).textContent = item[colName];
-                        }
-                    }
-                }
-                return rslt;
-            }
-
-            function getItemTemplate(withDescription, withExtra) {
-                var template, itmDiv;
-                if (!withDescription && !withExtra) {
-                    if ('captionOnlyTemplate' in obj) {
-                        template = obj.captionOnlyTemplate;
-                    } else {
-                        template = document.createElement('li');
-                        template.setAttribute('onmouseover', '$(this).addClass(\'hover\');');
-                        template.setAttribute('onmouseout', '$(this).removeClass(\'hover\');');
-                        template.setAttribute('onclick', 'w2ui[\''+obj.name+'\'].click(this.getAttribute(\'item_id\'), event);');
-                        template.setAttribute('ondblclick', 'w2ui[\''+obj.name+'\'].dblClick(this.getAttribute(\'item_id\'), event);');
-                        template.setAttribute('oncontextmenu', 'w2ui[\''+obj.name+'\'].contextMenu(this.getAttribute(\'item_id\'), event); if (event.preventDefault) event.preventDefault();');
-                        itmDiv = appendDiv(template);
-                        appendDiv(itmDiv, 'w2ui-listview-img');
-                        appendDiv(itmDiv, 'caption');
-                        obj.captionOnlyTemplate = template;
-                    }
-                } else if (withDescription && !withExtra) {
-                    if ('captionWithDescription' in obj) {
-                        template = obj.captionWithDescriptionTemplate;
-                    } else {
-                        template = getItemTemplate(false, false);
-                        itmDiv = template.querySelector('div');
-                        appendDiv(itmDiv, 'description');
-                        obj.captionWithDescriptionTemplate = template;
-                    }
-                } else if (!withDescription && withExtra) {
-                    if ('captionWithExtra' in obj) {
-                        template = obj.captionWithExtra;
-                    } else {
-                        template = appendExtra(getItemTemplate(false, false));
-                        obj.captionWithExtra = template;
-                    }
-                } else if (withDescription && withExtra) {
-                    if ('captionWithDescriptionAndExtra' in obj) {
-                        template = obj.captionWithDescriptionAndExtra;
-                    } else {
-                        template = appendExtra(getItemTemplate(true, false));
-                        obj.captionWithDescriptionAndExtra = template;
-                    }
-                }
-                return template.cloneNode(true);
-
-                function appendExtra(node) {
-                    var itmDiv = node.querySelector('div');
-                    var extra = appendDiv(itmDiv, 'extra');
-                    extra.style.width = extraColsWidth() + 'px';
-                    extra = appendDiv(extra);
-                    for (var i = 0; i < obj.extraCols.length; i++) {
-                        var col = obj.extraCols[i];
-                        var extraCol = appendDiv(extra, col.name);
-                        extraCol.style.width = col.width + 'px';
-                        if ('align' in col) extraCol.style.textAlign = col.align;
-                        if ('paddingLeft' in col) extraCol.style.paddingLeft = col.paddingLeft + 'px';
-                        if ('paddingRight' in col) extraCol.style.paddingRight = col.paddingRight + 'px';
-                    }
-                    return node;
-
-                    function extraColsWidth() {
-                        var rslt = 0;
-                        for (var i = 0; i < obj.extraCols.length; i++) {
-                            obj.extraCols[i].width = ('width' in obj.extraCols[i]) ? parseInt(obj.extraCols[i].width, 10) : 100;
-                            rslt += obj.extraCols[i].width;
-                        }
-                        return rslt;
-                    }
-                }
-            }
-
-            function appendDiv(parentElement, cls, txt) {
-                var div = document.createElement('div');
-                if (typeof cls !== 'undefined') div.className = cls;
-                if (typeof txt !== 'undefined') div.textContent = txt;
-                parentElement.appendChild(div);
-                return div;
-            }
-
-        },
-
-        render: function (box) {
-            var time = (new Date()).getTime();
-            // event before
-            var eventData = this.trigger({ phase: 'before', type: 'render', target: this.name, box: box });
-            if (eventData.isCancelled === true) return;
-            // default action
-            if (typeof box !== 'undefined' && box !== null && this.box !== box) {
-                if (this.lastItm) {
-                    while (this.box.hasChildNodes())
-                        this.box.removeChild(this.box.lastChild);
-                    $(this.box)
-                        .removeAttr('name')
-                        .removeClass('w2ui-reset w2ui-listview w2ui-icon-small w2ui-icon-medium w2ui-icon-large w2ui-icon-tile w2ui-table');
-                }
-                this.box = box;
-            }
-            if (!this.box) return false;
-            while (this.box.hasChildNodes())
-                this.box.removeChild(this.box.lastChild);
-            this.box.scrollTop = 0;
-
-            // render all items
-            var list = document.createElement('ul');
-            var lastItm = document.createElement('li');
-            lastItm.className = 'itmlast';
-            lastItm.style.display = 'none';
-            list.appendChild(lastItm);
-            $(this.box)
-                .attr('name', this.name)
-                .addClass('w2ui-reset w2ui-listview w2ui-' + this.viewType())
-                .append(list);
-            this.lastItm = lastItm;
-            this.refresh();
-            // event after
-            this.trigger($.extend(eventData, { phase: 'after' }));
-            return (new Date()).getTime() - time;
-        },
-
-        destroy: function () {
-            // event before
-            var eventData = this.trigger({ phase: 'before', type: 'destroy', target: this.name });
-            if (eventData.isCancelled === true) return;
-            // clean up
-            if (this.box) {
-                this.lastItm = null;
-                $(this.box)
-                    .empty()
-                    .removeAttr('name')
-                    .removeClass('w2ui-reset w2ui-listview w2ui-icon-small w2ui-icon-medium w2ui-icon-large w2ui-icon-tile w2ui-table');
-            }
-            delete w2ui[this.name];
-            // event after
-            this.trigger($.extend(eventData, { phase: 'after' }));
-            return true;
-        }
-    };
-
-    $.extend(w2listview.prototype, w2utils.event);
-    w2obj.listview = w2listview;
 })();

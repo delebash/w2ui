@@ -12,7 +12,7 @@
 <!--CODE-->
 <div id="grid" style="width: 100%; height: 400px;"></div>
 <br>
-<input type="button" onclick="showChanged()" value="Get Changed">
+<button class="btn" onclick="showChanged()">Get Changed</button>
 
 <!--CODE-->
 <script>
@@ -84,7 +84,7 @@ $(function () {
         ],
         toolbar: {
             items: [
-                { id: 'add', type: 'button', caption: 'Add Record', img: 'icon-add' }
+                { id: 'add', type: 'button', caption: 'Add Record', icon: 'w2ui-icon-plus' }
             ],
             onClick: function (event) {
                 if (event.target == 'add') {

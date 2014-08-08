@@ -8,7 +8,7 @@ $(function () {
             { type: 'main', style: 'background-color: white;' }
         ]
     });
-    w2ui['layout'].content('top', '<div style="padding: 12px 20px; font-size: 18px;">W2UI 1.3 Documentation</div>');
+    w2ui['layout'].content('top', '<div style="padding: 12px 20px; font-size: 18px;">W2UI 1.4 Documentation</div>');
     // init sidebar
     w2ui['layout'].content('left', $().w2sidebar({
         name: 'docs',
@@ -34,11 +34,11 @@ $(function () {
                 { id: 'w2sidebar-props', text: 'Properties', icon: 'fa-star-empty' },
                 { id: 'w2sidebar-methods', text: 'Methods', icon: 'fa-cog' }
             ] },
-            { id: 'w2listview', text: 'w2listview', img: 'icon-folder', group1: true, nodes: [
-                { id: 'w2listview-events', text: 'Events', icon: 'fa-tag' },
-                { id: 'w2listview-props', text: 'Properties', icon: 'fa-star-empty' },
-                { id: 'w2listview-methods', text: 'Methods', icon: 'fa-cog' }
-            ] },
+            // { id: 'w2listview', text: 'w2listview', img: 'icon-folder', group1: true, nodes: [
+            //     { id: 'w2listview-events', text: 'Events', icon: 'fa-tag' },
+            //     { id: 'w2listview-props', text: 'Properties', icon: 'fa-star-empty' },
+            //     { id: 'w2listview-methods', text: 'Methods', icon: 'fa-cog' }
+            // ] },
             { id: 'w2tabs', text: 'w2tabs', img: 'icon-folder', group1: true, nodes: [
                 { id: 'w2tabs-events', text: 'Events', icon: 'fa-tag' },
                 { id: 'w2tabs-props', text: 'Properties', icon: 'fa-star-empty' },
@@ -71,7 +71,7 @@ $(function () {
     $().w2grid({ name: 'test-grid' });
     $().w2sidebar({ name: 'test-sidebar' });
     $().w2toolbar({ name: 'test-toolbar' });
-    $().w2listview({ name: 'test-listview' });
+    // $().w2listview({ name: 'test-listview' });
     $().w2tabs({ name: 'test-tabs' });
     $().w2form({ name: 'test-form' });
 
@@ -80,7 +80,7 @@ $(function () {
     init('grid');
     init('sidebar');
     init('toolbar');
-    init('listview');
+    // init('listview');
     init('tabs');
     init('form');
     initPopup();
@@ -105,10 +105,10 @@ $(function () {
     // remove internal methods/props
     w2ui['docs'].remove(
         'w2layout.panel',
-        'w2grid.isIOS',
+        'w2grid.isIOS', 'w2grid.editChange', 'w2grid.initColumnDrag', 'w2grid.prepareData',
         'w2toolbar.item',
         'w2sidebar.node',
-        'w2listview.item', 'w2listview.vType', 'w2listview.itemExtra', 'w2listview.itemNode', 'w2listview.itemNodeId', 'w2listview.itemNodeOffsetInfo',
+        // 'w2listview.item', 'w2listview.vType', 'w2listview.itemExtra', 'w2listview.itemNode', 'w2listview.itemNodeId', 'w2listview.itemNodeOffsetInfo',
         'w2tabs.tab'
     );
 
